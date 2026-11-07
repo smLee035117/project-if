@@ -9,7 +9,9 @@
 
 
 import type { PlayState } from "./types/play.js";
+import type { PlayData } from "./types/play.js";
 import type { ChoiceGrade } from "./types/play.js";
+
 
 //const badGrade: ChoiceGrade[] = ["BAD", "WORST", "INSTANT_DEATH"];
 
@@ -41,7 +43,8 @@ function stageMake(): ChoiceGrade[][] {
     let stageArr:ChoiceGrade[][] = [];
 
     for(let i = 0; i < 20; i++) {
-        stageArr[i] = [];
+        
+        //stageArr[i] = [];
         
         // GOOD 등급 선지 하나 추가
         //stageArr[i].push("GOOD");
@@ -73,7 +76,7 @@ function stageMake(): ChoiceGrade[][] {
         const rollSuffle = randomInt(0, 100);
         if (rollSuffle < 50) {
             // 둘 순서 바꾸기
-            [choices[1],choices[0]] = [choices[1],choices[0]];
+            [choices[0],choices[1]] = [choices[1],choices[0]];
         } else {
             // 안 바꾸기
         }
@@ -84,30 +87,77 @@ function stageMake(): ChoiceGrade[][] {
     return stageArr;
 }
 
+// 숫자 값 입력 받은 뒤 처리
+function changeScore(data:PlayData, scoreVal:ChoiceGrade): void {
+
+   
 
 
+
+
+    switch(scoreVal) {
+        case "BAD":
+            data.score -=5;
+            break;
+        case "WORST":    
+            data.score -=25;
+            break;
+                
+        default:
+            break;
+    }
+
+    
+
+    // 즉사 처리
+    if(scoreVal == "INSTANT_DEATH" || 0 >= data.score) {
+            
+        data.state = "FAILED";
+        return;
+    }
+
+
+    
+
+    if(data.currentStep == 19) {
+        data.state = "CLEARD";
+        return;
+    }
+
+    data.currentStep+=1;
+
+}
+
+
+// 입력함수 예시
 async function testInput(): Promise<void> {
 
 
     let checkArr = stageMake();
     //console.log(checkArr);
+    
 
-    let stageCnt:number = 0;
 
-    let score = 100;
 
-    let deathReason:string = '';
+    let playDATA:PlayData = {
+        userId      :   10,           // 유저정보
+        userType    :   0,            // 유저 타입 게스트/회원
+        score       :   100,          // 점수
+        state       :'PLAYING',       // 플레이 상태
+        currentStep :   0,            // 시나리오 단계 1~20
+        scenarioId  :   0,            // 시나리오 종류 첫 시나리오는 0
+    }
 
-    let stageResult:PlayState = 'PLAYING';
-
-    while(1) {
+    while(playDATA.state === "PLAYING") {
 
         const answer = await rl.question("0 또는 1을 선택하세요 : ");
 
         if (answer !== "0" && answer !== "1") {
             if(answer == "gg") {
                 console.log('중도 포기합니다.');
-                stageResult = 'GIVEN_UP';
+                //stageResult = 'GIVEN_UP';
+
+                playDATA.state = 'GIVEN_UP';
 
                 break;
             }
@@ -120,11 +170,13 @@ async function testInput(): Promise<void> {
 
         
 
-        const currentStage = checkArr[stageCnt];
+        const currentStage = checkArr[playDATA.currentStep];
+
 
         
         if (currentStage === undefined) {
             console.log("스테이지 데이터가 존재하지 않습니다.");
+            //TODO 비정상 종료용 코드 PlayState값 추가 필요
             break;
         }
 
@@ -132,62 +184,31 @@ async function testInput(): Promise<void> {
 
         if (scoreVal === undefined) {
             console.log("선택지가 존재하지 않습니다.");
+            //TODO 비정상 종료용 코드 PlayState값 추가 필요
             continue;
         }
 
-       
 
-        switch(scoreVal) {
-            case "BAD":
-                score -=5;
-                break;
-            case "WORST":    
-            score -=25;
-                break;
-                
-            default:
-                break;
-        }
+        console.log("입력된 값 : ", numAnswer);
 
-        console.log("입력된 값 : ", answer);
-        console.log("결과 : ", scoreVal);
-        console.log("현재 상태 : ", score);
+       // playData 처리 로직
+       //function changeScore(data:PlayData, scoreVal:ChoiceGrade):void {}
+       changeScore(playDATA,scoreVal);
 
-        // 즉사 처리
-        if(scoreVal == "INSTANT_DEATH" || 0 >= score) {
-            
-            if(scoreVal == "INSTANT_DEATH") deathReason = '즉사';
-            else deathReason = '상태악화';
-
-             
-            break;
-        }
-
-        stageCnt+=1;
+       console.log("이번 선택 결과 : ", scoreVal);
+        console.log("현재 점수 : ", playDATA.score);
 
 
-        if(stageCnt == 20) {
 
-            break;
-        }
     }
-        // 입력 인터페이스 종료
-        rl.close(); 
+    // 입력 인터페이스 종료
+    rl.close(); 
 
-    if('PLAYING' == stageResult) {
-        if('' == deathReason) {
-        stageResult = 'CLEARD';
-         
-        } else {
-        stageResult = 'FAILED';
-        }
-    }
+
     
     
-    console.log(" 결과 : ", stageResult);
-    if('' != deathReason) {
-        console.log(" 사망 원인 : ", deathReason);
-    }
+    console.log(" 결과 : ", playDATA.state);
+
 
   
 }
