@@ -5,3 +5,6 @@ dist/
 !.env.example
 *.log
 hello.js
+
+# TypeScript incremental build cache
+*.tsbuildinfo
