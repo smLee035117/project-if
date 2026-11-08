@@ -1,0 +1,30 @@
+{
+  "groupId": "blackout_test_01",
+  "title": "정전 상황 테스트",
+  "stages": [
+    {
+      "stageId": "stage_01",
+      "description": "정전이 발생했습니다. 휴대전화 배터리가 부족합니다.",
+      "choices": [
+        { "id": "choice_a", "text": "휴대전화 사용을 줄인다.", "grade": "GOOD" },
+        { "id": "choice_b", "text": "휴대전화를 계속 사용한다.", "grade": "BAD" }
+      ]
+    },
+    {
+      "stageId": "stage_02",
+      "description": "주변 상황을 파악해야 합니다.",
+      "choices": [
+        { "id": "choice_a", "text": "안전한 곳에서 상황을 확인한다.", "grade": "GOOD" },
+        { "id": "choice_b", "text": "주변 상황을 확인하지 않고 이동한다.", "grade": "WORST" }
+      ]
+    },
+    {
+      "stageId": "stage_03",
+      "description": "어두운 계단을 내려가야 할지 결정해야 합니다.",
+      "choices": [
+        { "id": "choice_a", "text": "조명을 확보하고 계단 상태를 확인한다.", "grade": "GOOD" },
+        { "id": "choice_b", "text": "시야가 확보되지 않은 채 급하게 내려간다.", "grade": "INSTANT_DEATH" }
+      ]
+    }
+  ]
+}

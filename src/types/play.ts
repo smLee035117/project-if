@@ -1,5 +1,5 @@
 // 플레이 상태 타입
-export type PlayState = "PLAYING" | "FAILED"  | "CLEARD"| "GIVEN_UP";
+export type PlayState = "PLAYING" | "FAILED"  | "CLEARED"| "GIVEN_UP";
 
 // 판정
 export type ChoiceGrade =
@@ -13,5 +13,5 @@ export interface PlayData {
     score:number;               // 점수
     state:PlayState;            // 플레이 상태
     currentStep:number;         // 시나리오 단계 1~20
-    scenarioId:number;          // 시나리오 종류 첫 시나리오는 0
+    scenarioId:string;          // 시나리오 종류 첫 시나리오는 0
 }

@@ -8,9 +8,10 @@
 // 또는 즉사하는 경우 플레이 종료
 
 
-import type { PlayState } from "./types/play.js";
+//import type { PlayState } from "./types/play.js";
 import type { PlayData } from "./types/play.js";
 import type { ChoiceGrade } from "./types/play.js";
+import type { Scenario } from "./types/scenario.js";
 
 
 //const badGrade: ChoiceGrade[] = ["BAD", "WORST", "INSTANT_DEATH"];
@@ -24,10 +25,10 @@ import type { ChoiceGrade } from "./types/play.js";
 //  const randomGrade = badGrade[randomIndex];
 
 
-
+// 랜덤 정수
 import { randomInt } from "node:crypto";
 
-
+// 터미널 인터페이스
 import { createInterface } from "node:readline/promises";
 
 const rl = createInterface({
@@ -36,10 +37,12 @@ const rl = createInterface({
 });
 
 
+// 파일 읽기
+import { readFileSync } from "node:fs";
 
 
 // 20스테이지 양자택일 테스트 데이터
-function stageMake(): ChoiceGrade[][] {
+/* function stageMake(): ChoiceGrade[][] {
     let stageArr:ChoiceGrade[][] = [];
 
     for(let i = 0; i < 20; i++) {
@@ -85,10 +88,10 @@ function stageMake(): ChoiceGrade[][] {
     }
 
     return stageArr;
-}
+} */
 
 // 숫자 값 입력 받은 뒤 처리
-function changeScore(data:PlayData, scoreVal:ChoiceGrade): void {
+function changeScore(data:PlayData, scoreVal:ChoiceGrade, totalSteps:number): void {
 
    
 
@@ -117,10 +120,11 @@ function changeScore(data:PlayData, scoreVal:ChoiceGrade): void {
     }
 
 
-    
+    //if(data.currentStep == 19) {
 
-    if(data.currentStep == 19) {
-        data.state = "CLEARD";
+    //totalSteps = stages.length
+    if(data.currentStep == totalSteps - 1) {
+        data.state = "CLEARED";
         return;
     }
 
@@ -128,27 +132,89 @@ function changeScore(data:PlayData, scoreVal:ChoiceGrade): void {
 
 }
 
+// 시나리오 데이터 불러오기
+function loadScenario(scenarioId: string): Scenario {
+    const scenarioFiles: Record<string, string> = {
+        blackout_test_01: "./data/blackout_test_01.json",
+    };
+
+    // 등록된 ID인지 확인
+    if (!Object.prototype.hasOwnProperty.call(scenarioFiles, scenarioId)) {
+        throw new Error(`존재하지 않는 시나리오입니다: ${scenarioId}`);
+    }
+
+    const filePath = scenarioFiles[scenarioId];
+
+    if (filePath === undefined) {
+        throw new Error(`시나리오 파일 경로가 없습니다: ${scenarioId}`);
+    }
+
+    const jsonText = readFileSync(filePath, "utf-8");
+    const scenario: Scenario = JSON.parse(jsonText);
+
+    return scenario;
+}
+
+
+
+
 
 // 입력함수 예시
-async function testInput(): Promise<void> {
+async function testInput(scenarioId: string): Promise<void> {
 
 
-    let checkArr = stageMake();
+    //let checkArr = stageMake();
     //console.log(checkArr);
     
+    // const checkArr = readFileSync(
+    //     "./data/blackout_test_01.json",
+    //     "utf-8"
+    // );
+
+    //const scenario: Scenario = JSON.parse(checkArr);
 
 
+    const scenario = loadScenario(scenarioId);
+    const stagesLen = scenario.stages.length
+
+
+    console.log(scenario.title);
+    console.log(scenario.stages.length); // 3
+
+    console.log(scenario);
+    
 
     let playDATA:PlayData = {
         userId      :   10,           // 유저정보
         userType    :   0,            // 유저 타입 게스트/회원
         score       :   100,          // 점수
         state       :'PLAYING',       // 플레이 상태
-        currentStep :   0,            // 시나리오 단계 1~20
-        scenarioId  :   0,            // 시나리오 종류 첫 시나리오는 0
+        currentStep :   0,            // 현재 스테이지 인덱스(0부터 시작)
+        scenarioId  :   scenarioId,  // 시나리오 종류 문자열로 등록됨
     }
 
     while(playDATA.state === "PLAYING") {
+
+
+        //const currentStage = checkArr[playDATA.currentStep];
+
+        const currentStage = scenario.stages[playDATA.currentStep];
+
+
+
+        
+        if (currentStage === undefined) {
+            throw new Error("스테이지 데이터가 존재하지 않습니다.");
+
+
+        }
+
+        console.log(currentStage.description);
+        currentStage.choices.forEach((choice, index) => {
+            console.log(`${index}: ${choice.text}`);
+        });
+
+
 
         const answer = await rl.question("0 또는 1을 선택하세요 : ");
 
@@ -170,39 +236,36 @@ async function testInput(): Promise<void> {
 
         
 
-        const currentStage = checkArr[playDATA.currentStep];
-
-
         
-        if (currentStage === undefined) {
-            console.log("스테이지 데이터가 존재하지 않습니다.");
-            //TODO 비정상 종료용 코드 PlayState값 추가 필요
-            break;
-        }
 
-        const scoreVal = currentStage[numAnswer];
+        //const scoreVal = currentStage[numAnswer];
+        const choice = currentStage.choices[numAnswer];
 
-        if (scoreVal === undefined) {
+        if (choice === undefined) {
             console.log("선택지가 존재하지 않습니다.");
             //TODO 비정상 종료용 코드 PlayState값 추가 필요
             continue;
         }
 
+        const scoreVal = choice.grade;
+
+        
+
 
         console.log("입력된 값 : ", numAnswer);
 
-       // playData 처리 로직
-       //function changeScore(data:PlayData, scoreVal:ChoiceGrade):void {}
-       changeScore(playDATA,scoreVal);
+        // playData 처리 로직
+        //function changeScore(data:PlayData, scoreVal:ChoiceGrade):void {}
+        changeScore(playDATA,scoreVal,stagesLen);
 
-       console.log("이번 선택 결과 : ", scoreVal);
+        console.log("이번 선택 결과 : ", scoreVal);
         console.log("현재 점수 : ", playDATA.score);
 
 
 
     }
-    // 입력 인터페이스 종료
-    rl.close(); 
+    
+
 
 
     
@@ -213,4 +276,11 @@ async function testInput(): Promise<void> {
   
 }
 
-void testInput();
+void testInput("blackout_test_01")
+    .catch((error: unknown) => {
+        console.error("실행 중 오류가 발생했습니다:", error);
+    })
+    .finally(() => {
+        // 입력 인터페이스 종료
+        rl.close();
+    });
