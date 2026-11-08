@@ -132,10 +132,99 @@ function changeScore(data:PlayData, scoreVal:ChoiceGrade, totalSteps:number): vo
 
 }
 
+
+
+// null과 배열을 제외한 객체인지 확인
+function isRecord(value: unknown): value is Record<string, unknown> {
+    return (
+        typeof value === "object" &&
+        value !== null &&
+        !Array.isArray(value)
+    );
+}
+
+// 비어 있지 않은 문자열인지 확인
+function isNonEmptyString(value: unknown): value is string {
+    return typeof value === "string" && value.trim().length > 0;
+}
+
+// 허용된 판정값인지 확인
+function isChoiceGrade(value: unknown): value is ChoiceGrade {
+    return (
+        value === "GOOD" ||
+        value === "BAD" ||
+        value === "WORST" ||
+        value === "INSTANT_DEATH"
+    );
+}
+
+// 시나리오 전체 구조 검사
+function validateScenario(value: unknown): asserts value is Scenario {
+    if (!isRecord(value)) {
+        throw new Error("시나리오는 객체여야 합니다.");
+    }
+
+    if (!isNonEmptyString(value.scenarioId)) {
+        throw new Error("scenarioId는 비어 있지 않은 문자열이어야 합니다.");
+    }
+
+    if (!isNonEmptyString(value.title)) {
+        throw new Error("title은 비어 있지 않은 문자열이어야 합니다.");
+    }
+
+    if (!Array.isArray(value.stages) || value.stages.length === 0) {
+        throw new Error("stages는 비어 있지 않은 배열이어야 합니다.");
+    }
+
+    for (const [stageIndex, stage] of value.stages.entries()) {
+        const stageLabel = `stages[${stageIndex}]`;
+
+        if (!isRecord(stage)) {
+            throw new Error(`${stageLabel}는 객체여야 합니다.`);
+        }
+
+        if (!isNonEmptyString(stage.stageId)) {
+            throw new Error(`${stageLabel}.stageId가 올바르지 않습니다.`);
+        }
+
+        if (!isNonEmptyString(stage.description)) {
+            throw new Error(`${stageLabel}.description이 올바르지 않습니다.`);
+        }
+
+        if (!Array.isArray(stage.choices) || stage.choices.length !== 2) {
+            throw new Error(`${stageLabel}.choices는 선택지 2개를 가진 배열이어야 합니다.`);
+        }
+
+        for (const [choiceIndex, choice] of stage.choices.entries()) {
+            const choiceLabel = `${stageLabel}.choices[${choiceIndex}]`;
+
+            if (!isRecord(choice)) {
+                throw new Error(`${choiceLabel}는 객체여야 합니다.`);
+            }
+
+            if (!isNonEmptyString(choice.id)) {
+                throw new Error(`${choiceLabel}.id가 올바르지 않습니다.`);
+            }
+
+            if (!isNonEmptyString(choice.text)) {
+                throw new Error(`${choiceLabel}.text가 올바르지 않습니다.`);
+            }
+
+            if (!isChoiceGrade(choice.grade)) {
+                throw new Error(`${choiceLabel}.grade가 허용된 판정값이 아닙니다.`);
+            }
+        }
+    }
+}
+
+
+
+
 // 시나리오 데이터 불러오기
 function loadScenario(scenarioId: string): Scenario {
     const scenarioFiles: Record<string, string> = {
         blackout_test_01: "./data/blackout_test_01.json",
+        invalid_test_01: "./data/invalid_test_01.json",
     };
 
     // 등록된 ID인지 확인
@@ -150,7 +239,20 @@ function loadScenario(scenarioId: string): Scenario {
     }
 
     const jsonText = readFileSync(filePath, "utf-8");
-    const scenario: Scenario = JSON.parse(jsonText);
+
+    // 아직 구조 확인되지 않은 데이터
+    const scenario: unknown = JSON.parse(jsonText);
+
+    // 실제 데이터 구조 검사
+    validateScenario(scenario);
+
+    // 요청한 ID와 파일 내부 ID가 같은지 검사
+    if (scenario.scenarioId !== scenarioId) {
+        throw new Error(
+            `시나리오 ID가 일치하지 않습니다: 요청=${scenarioId}, 파일=${scenario.scenarioId}`
+        );
+    }
+
 
     return scenario;
 }

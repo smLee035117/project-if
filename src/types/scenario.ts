@@ -16,7 +16,7 @@ export type ScenarioStage = {
 
 // 시나리오 전체
 export type Scenario = {
-    groupId: string;
+    scenarioId: string;
     title: string;
     stages: ScenarioStage[];
 };

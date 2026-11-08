@@ -1,5 +1,5 @@
 {
-  "groupId": "blackout_test_01",
+  "scenarioId": "blackout_test_01",
   "title": "정전 상황 테스트",
   "stages": [
     {

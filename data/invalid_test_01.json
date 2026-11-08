@@ -1,0 +1,22 @@
+{
+  "scenarioId": "invalid_test_01",
+  "title": "잘못된 판정값 검증",
+  "stages": [
+    {
+      "stageId": "stage_01",
+      "description": "판정값 검증용 상황입니다.",
+      "choices": [
+        {
+          "id": "choice_a",
+          "text": "정상 선택지",
+          "grade": "GOOD"
+        },
+        {
+          "id": "choice_b",
+          "text": "잘못된 판정값 선택지",
+          "grade": "WRONG"
+        }
+      ]
+    }
+  ]
+}
