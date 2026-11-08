@@ -38,7 +38,8 @@ const rl = createInterface({
 
 
 // 파일 읽기
-import { readFileSync } from "node:fs";
+//import { readFileSync } from "node:fs";
+import { readFile } from 'node:fs/promises';
 
 
 // 20스테이지 양자택일 테스트 데이터
@@ -221,7 +222,7 @@ function validateScenario(value: unknown): asserts value is Scenario {
 
 
 // 시나리오 데이터 불러오기
-function loadScenario(scenarioId: string): Scenario {
+export async function loadScenario(scenarioId: string): Promise<Scenario> {
     const scenarioFiles: Record<string, string> = {
         blackout_test_01: "./data/blackout_test_01.json",
         invalid_test_01: "./data/invalid_test_01.json",
@@ -238,7 +239,7 @@ function loadScenario(scenarioId: string): Scenario {
         throw new Error(`시나리오 파일 경로가 없습니다: ${scenarioId}`);
     }
 
-    const jsonText = readFileSync(filePath, "utf-8");
+    const jsonText =  await readFile(filePath, 'utf-8');
 
     // 아직 구조 확인되지 않은 데이터
     const scenario: unknown = JSON.parse(jsonText);
@@ -276,8 +277,8 @@ async function testInput(scenarioId: string): Promise<void> {
     //const scenario: Scenario = JSON.parse(checkArr);
 
 
-    const scenario = loadScenario(scenarioId);
-    const stagesLen = scenario.stages.length
+    const scenario = await loadScenario(scenarioId);
+    const stagesLen =  scenario.stages.length
 
 
     console.log(scenario.title);
