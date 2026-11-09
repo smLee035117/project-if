@@ -8,3 +8,5 @@ hello.js
 
 # TypeScript incremental build cache
 *.tsbuildinfo
+
+guest-cookies.txt

@@ -98,6 +98,13 @@ function validateScenario(value: unknown): asserts value is Scenario {
 }
 
 
+export class ScenarioNotFoundError extends Error {
+  constructor(scenarioId: string) {
+    super(`존재하지 않는 시나리오입니다: ${scenarioId}`);
+    this.name = 'ScenarioNotFoundError';
+  }
+}
+
 
 
 // 시나리오 데이터 불러오기
@@ -111,7 +118,7 @@ export async function loadScenario(
 
   // 등록된 시나리오인지 확인
   if (!Object.prototype.hasOwnProperty.call(scenarioFiles, scenarioId)) {
-    throw new Error(`존재하지 않는 시나리오입니다: ${scenarioId}`);
+    throw new ScenarioNotFoundError(scenarioId);
   }
 
   const fileName = scenarioFiles[scenarioId];
