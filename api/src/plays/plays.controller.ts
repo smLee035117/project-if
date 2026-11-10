@@ -2,8 +2,12 @@ import { Controller, Get,Param, Post,Body ,HttpCode, Req ,Res , } from '@nestjs/
 import { PlaysService } from './plays.service.js';
 
 import { StartPlayDto } from './dto/start-play.dto.js';
+import { SubmitChoiceDto } from './dto/submit-choice.dto.js';
 
 import type { Request, Response } from 'express';
+import { PlayData } from './types/play.js';
+
+
 
 
 @Controller('plays')
@@ -35,7 +39,7 @@ export class PlaysController {
     ) {
         const guestToken: unknown = request.cookies?.guest_token;
 
-        const { playData, newToken } =
+        const { playId,playData, newToken } =
             await this.playsService.startPlay(
             body.scenarioId,
             typeof guestToken === 'string' ? guestToken : undefined,
@@ -51,7 +55,7 @@ export class PlaysController {
             });
         }
 
-        return playData;
+        return { playId, playData };
     }
 
 
@@ -62,5 +66,27 @@ export class PlaysController {
         return {
             hasGuestCookie: typeof token === 'string',
         };
+    }
+
+    @Get(':playId')
+    async getPlayForGuest(@Param('playId') playId: string, @Req() request: Request ) : Promise<PlayData>{
+        const token = request.cookies?.guest_token;
+
+        return this.playsService.getPlayForGuest(playId,typeof token === 'string' ? token : undefined,);
+
+    }
+
+
+    @Post(':playId/choices')
+    async submitChoice(
+    @Param('playId') playId: string,
+    @Body() body: SubmitChoiceDto,
+    @Req() request: Request,
+    ) {
+        const token = request.cookies?.guest_token;
+
+        // playId, choiceId, hasGuestCookie 반환
+        return await this.playsService.submitChoice(playId,body.choiceId, body.stageId,	typeof token === 'string' ? token : undefined);
+
     }
 }

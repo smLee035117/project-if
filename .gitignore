@@ -10,3 +10,6 @@ hello.js
 *.tsbuildinfo
 
 guest-cookies.txt
+
+/api/cookies.txt
+/api/other-guest-cookies.txt
