@@ -3,6 +3,8 @@ import { ConfigService } from '@nestjs/config';
 import { createPool, type Pool,  } from 'mysql2/promise';
 import type { ResultSetHeader, RowDataPacket  } from 'mysql2';
 
+import type { PlayData } from '../plays/types/play.js';
+
 interface GuestSessionRow extends RowDataPacket {
   user_no: number;
 }
@@ -88,6 +90,38 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy  {
         } finally {
             connection.release();
         }
+    }
+
+
+
+    async savePlayResult(
+        playId: string,
+        playData: PlayData,
+    ): Promise<void> {
+         
+
+        
+
+        // 1. PLAYING 상태라면 저장 거절
+
+        if(playData.state === 'PLAYING') {
+            throw new Error('진행 중인 플레이는 저장할 수 없습니다.');
+        }
+
+        // 2. INSERT SQL 작성
+        const sql = 'INSERT INTO user_play_log (play_id, user_no, scenario_id, score, result_state, finished_at) VALUES (?, ?, ?, ?, ?, UTC_TIMESTAMP(6))';
+        // 3. this.pool.execute()로 저장
+
+        await this.pool.execute(sql, 
+            [
+                playId,
+                playData.userId,
+                playData.scenarioId,
+                playData.score,
+                playData.state,
+            ]
+        );
+
     }
 
 }
