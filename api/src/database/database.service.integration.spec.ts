@@ -51,9 +51,9 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  await moduleRef.close();
+    await moduleRef.close();
 
-  await verifyConnection.end();
+    await verifyConnection.end();
 });
 
 
@@ -127,51 +127,99 @@ test('진행 중인 플레이 결과는 저장하지 않는다', async () => {
     [playId],
     );
 
-
+    expect(rows.length).toBe(0);
 });
 
 
 
-test('동일한 playId는 중복 저장되지 않는다', async () => {
-  const playId = `test-duplicate-${randomUUID()}`;
+test('동일한 playId와 동일한 결과를 재저장하면 성공하고, DB에는 1건만 유지된다', async () => {
+    const playId = `test-duplicate-${randomUUID()}`;
 
-  const playData: PlayData = {
-    userId: 4,
-    userType: 0,
-    score: 85,
-    state: 'CLEARED',
-    currentStep: 1,
-    scenarioId: 'blackout_test_01',
-  };
+    const playData: PlayData = {
+      userId: 4,
+      userType: 0,
+      score: 85,
+      state: 'CLEARED',
+      currentStep: 1,
+      scenarioId: 'blackout_test_01',
+    };
 
-  try {
-    // 1. 첫 번째 저장 성공
-    await expect(
-    service.savePlayResult(playId, playData)
-    ).resolves.toBeUndefined();
+    try {
+      // 1. 첫 번째 저장 성공
+      await expect(
+      service.savePlayResult(playId, playData)
+      ).resolves.toBeUndefined();
 
-    // 2. 두 번째 저장 시 ER_DUP_ENTRY 오류 확인
-    await expect(
-        service.savePlayResult(playId, playData)
-        ).rejects.toMatchObject({
-        code: 'ER_DUP_ENTRY',
-    });
+      // 2. 동일한 결과를 다시 저장해도 오류 없이 성공하는지 확인
+      await expect(
+          service.savePlayResult(playId, playData)
+          ).resolves.toBeUndefined();
 
-    // 3. SELECT로 데이터가 정확히 1건인지 확인
-    const [rows] = await verifyConnection.execute<CountRow[]>(
-        `SELECT COUNT(*) AS cnt
-        FROM user_play_log
-        WHERE play_id = ?`,
+      // 3. 재저장 이후에도 DB 기록이 정확히 1건인지 확인
+      const [rows] = await verifyConnection.execute<CountRow[]>(
+          `SELECT COUNT(*) AS cnt
+          FROM user_play_log
+          WHERE play_id = ?`,
+          [playId],
+      );
+
+      expect(rows[0].cnt).toBe(1);
+
+
+    } finally {
+      await verifyConnection.execute(
+        'DELETE FROM user_play_log WHERE play_id = ?',
         [playId],
-    );
+      );
+    }
+});
 
-    expect(rows[0].cnt).toBe(1);
+
+test('동일한 playId에 서로 다른 결과를 저장하면 거절한다', async () => {
+    const playId = `test-duplicate-${randomUUID()}`;
+
+    const playData: PlayData = {
+      userId: 4,
+      userType: 0,
+      score: 85,
+      state: 'CLEARED',
+      currentStep: 1,
+      scenarioId: 'blackout_test_01',
+    };
+
+    try {
+        await expect(
+        service.savePlayResult(playId, playData)
+      ).resolves.toBeUndefined();
+
+      const modifiedPlayData = {
+        ...playData,
+        score: 80,
+      };
+
+      await expect(
+        service.savePlayResult(playId, modifiedPlayData)
+      ).rejects.toThrow('기존 플레이 결과와 저장 요청이 일치하지 않습니다.');
+
+      const [rows] = await verifyConnection.execute<PlayResultRow[]>(
+            `SELECT score
+            FROM user_play_log
+            WHERE play_id = ?`,
+            [playId],
+      );
 
 
-  } finally {
-    await verifyConnection.execute(
-      'DELETE FROM user_play_log WHERE play_id = ?',
-      [playId],
-    );
-  }
+      expect(rows.length).toBe(1);
+      expect(rows[0].score).toBe(85);
+    } finally {
+        await verifyConnection.execute(
+                'DELETE FROM user_play_log WHERE play_id = ?',
+                [playId],
+        );
+    }
+    
+
+    
+
+
 });

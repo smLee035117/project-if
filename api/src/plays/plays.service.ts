@@ -210,6 +210,11 @@ export class PlaysService {
           throw new ConflictException('플레이 상태가 변경되었거나 만료되었습니다. 다시 조회해 주세요.');
         }
 
+        if('PLAYING' !== playData.state && 'GIVEN_UP' !== playData.state) {
+          await this.databaseService.savePlayResult(playId,playData);
+          await this.redisService.deletePendingPlayResult(playId);
+        }
+
         const data = {
             'id': choice.id,
             'grade': choice.grade,

@@ -9,6 +9,14 @@ interface GuestSessionRow extends RowDataPacket {
   user_no: number;
 }
 
+interface PlayResultRow extends RowDataPacket {
+  user_no: number;
+  scenario_id: string;
+  score: number;
+  result_state: string;
+}
+
+
 @Injectable()
 export class DatabaseService implements OnModuleInit, OnModuleDestroy  {
     private readonly pool: Pool;
@@ -112,15 +120,47 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy  {
         const sql = 'INSERT INTO user_play_log (play_id, user_no, scenario_id, score, result_state, finished_at) VALUES (?, ?, ?, ?, ?, UTC_TIMESTAMP(6))';
         // 3. this.pool.execute()로 저장
 
-        await this.pool.execute(sql, 
-            [
+        try {
+            await this.pool.execute(sql, [
                 playId,
                 playData.userId,
                 playData.scenarioId,
                 playData.score,
                 playData.state,
-            ]
-        );
+            ]);
+            } catch (error) {
+            if (
+                error instanceof Error &&
+                'code' in error &&
+                error.code === 'ER_DUP_ENTRY'
+            ) {
+                // 다음 단계: 기존 저장 결과 조회 및 비교
+                const selectSQL = 'SELECT user_no, scenario_id, score, result_state FROM user_play_log WHERE play_id = ?;';
+                
+                const [rows] = await this.pool.execute<PlayResultRow[]>(selectSQL, [playId],);
+
+                if (rows.length === 0) {
+                    throw new Error('중복 키 오류가 발생했지만 기존 플레이 결과를 찾을 수 없습니다.');
+                    
+                }
+
+                const exsting = rows[0];
+
+                if(exsting.user_no === playData.userId &&
+                    exsting.scenario_id === playData.scenarioId &&
+                    exsting.score === playData.score &&
+                    exsting.result_state === playData.state
+                ) {
+
+                     return;
+                }
+
+                throw new Error('기존 플레이 결과와 저장 요청이 일치하지 않습니다.');
+
+            } else {
+                throw error;
+            }
+        }
 
     }
 

@@ -67,12 +67,31 @@ export class RedisService
   }
 
 
+  async getPendingPlayResult(playId: string): Promise<PlayData | null> {
+    // 기존 getPlay()를 참고하여 구현
+    const value = await this.client.get(`pending:play-result:${playId}`);
+
+    if (value === null) {
+        return null;
+    }
+
+     const data: PlayData = JSON.parse(value);
+
+     return data;
+    
+  }
+
+
+
+
   async updatePlayIfCurrent(
     playId: string,
     expectedStep: number,
     data: PlayData,
   ): Promise<boolean> {
     const key = `play:${playId}`;
+
+    const pendingKey = `pending:play-result:${playId}`;
 
     const script = `
       local value = redis.call('GET', KEYS[1])
@@ -91,13 +110,22 @@ export class RedisService
         return 0
       end
 
+
+      local valChk = cjson.decode(ARGV[2])
+
+      if valChk.state == 'CLEARED' or
+          valChk.state == 'FAILED' or
+          valChk.state == 'GIVEN_UP' then
+         redis.call('SET', KEYS[2], ARGV[2])
+      end
+
       redis.call('SET', KEYS[1], ARGV[2], 'EX', 3600)
 
       return 1
     `;
 
     const result = await this.client.eval(script, {
-      keys: [key],
+      keys: [key,pendingKey],
       arguments: [
         String(expectedStep),
         JSON.stringify(data),
@@ -106,5 +134,40 @@ export class RedisService
 
     return result === 1;
   }
+
+  async deletePendingPlayResult(playId: string): Promise<void> {
+    
+      const pendingKey = `pending:play-result:${playId}`;
+      await this.client.del(pendingKey);
+
+  }
   
+
+
+  async scanPendingPlayIds(): Promise<string[]> {
+      const prefix = 'pending:play-result:';
+      const playIds = new Set<string>();
+
+      for await (const keys of this.client.scanIterator({
+        MATCH: `${prefix}*`,
+        COUNT: 100,
+      })) {
+        // 검색된 key에서 playId 추출
+
+        for (const key of keys) {
+          const playId = key.slice(prefix.length);
+          
+          // playIds에 추가
+          playIds.add(playId);
+        }
+
+
+        
+        
+      }
+
+      return [...playIds];
+
+  }
+
 }
