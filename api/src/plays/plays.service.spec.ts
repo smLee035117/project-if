@@ -19,6 +19,8 @@ describe('PlaysService', () => {
     const redisMock = {
       updatePlayIfCurrent: vi.fn().mockResolvedValue(false),
       deletePendingPlayResult: vi.fn(),
+      scanPendingPlayIds : vi.fn(),
+      getPendingPlayResult : vi.fn(),
     };
 
     const databaseMock = {
@@ -186,6 +188,108 @@ describe('PlaysService', () => {
 
 
   });
+
+
+  
+  test('pending 결과를 MySQL에 저장하면 pending을 삭제한다', async () => {
+    const playId = 'test-recovery-1';
+
+    const pendingData = {
+      ...createInitialPlayData('blackout_test_01', 4, 0),
+      state: 'CLEARED' as const,
+    };
+
+    // 1. Redis에서 복구 대상 1건 반환
+    redisMock.scanPendingPlayIds.mockResolvedValueOnce([playId]);
+
+    // 2. 해당 플레이의 종료 데이터 반환
+    redisMock.getPendingPlayResult.mockResolvedValueOnce(pendingData);
+
+    // 3. MySQL 저장 성공 처리
+    databaseMock.savePlayResult.mockResolvedValueOnce(undefined);
+
+    // 4. 복구 메서드 실행
+    await service.recoverPendingPlayResults();
+
+    // 5. MySQL 저장 호출 검증
+    expect(databaseMock.savePlayResult).toHaveBeenCalledWith(playId, pendingData);
+
+
+
+    // 6. pending 삭제 호출 검증
+    expect(redisMock.deletePendingPlayResult).toHaveBeenCalledWith(playId);
+
+  });
+
+
+
+  test('MySQL 저장 실패 시 pending을 삭제하지 않는다', async () => {
+    const playId = 'test-recovery-fail';
+
+    const pendingData = {
+      ...createInitialPlayData('blackout_test_01', 4, 0),
+      state: 'CLEARED' as const,
+    };
+
+    redisMock.scanPendingPlayIds.mockResolvedValueOnce([playId]);
+
+    redisMock.getPendingPlayResult.mockResolvedValueOnce(pendingData);
+
+    databaseMock.savePlayResult.mockRejectedValueOnce(
+      new Error('DB 저장 실패'),
+    );
+
+    await service.recoverPendingPlayResults();
+
+    expect(databaseMock.savePlayResult).toHaveBeenCalledOnce();
+    expect(redisMock.deletePendingPlayResult).not.toHaveBeenCalled();
+
+  });
+
+
+
+  test('일부 복구에 실패해도 나머지 결과는 계속 처리한다', async () => {
+    const playIds = ['play-A', 'play-B', 'play-C'];
+
+    const pendingData = {
+      ...createInitialPlayData('blackout_test_01', 4, 0),
+      state: 'CLEARED' as const,
+    };
+
+    // 1. 복구 대상 3건 설정
+    redisMock.scanPendingPlayIds.mockResolvedValueOnce(playIds);
+
+    // 2. 각 playId에 대한 pending 데이터 반환
+    redisMock.getPendingPlayResult
+    .mockResolvedValueOnce(pendingData)
+    .mockResolvedValueOnce(pendingData)
+    .mockResolvedValueOnce(pendingData);
+
+    // 3. MySQL 저장 결과 설정
+    // A: 성공
+    // B: 실패
+    // C: 성공
+    databaseMock.savePlayResult
+    .mockResolvedValueOnce(undefined)
+    .mockRejectedValueOnce(new Error('DB 저장 실패'))
+    .mockResolvedValueOnce(undefined);
+
+    // 4. 복구 메서드 실행
+    await service.recoverPendingPlayResults();
+
+    // 5. MySQL 저장이 3번 시도됐는지 검증
+    expect(databaseMock.savePlayResult).toHaveBeenCalledTimes(3);
+
+    // 6. pending 삭제는 2번만 호출됐는지 검증
+    expect(redisMock.deletePendingPlayResult).toHaveBeenCalledTimes(2);
+
+    // 7. 삭제 대상이 A와 C인지 검증
+    expect(redisMock.deletePendingPlayResult).toHaveBeenNthCalledWith(1, 'play-A');
+    expect(redisMock.deletePendingPlayResult).toHaveBeenNthCalledWith(2, 'play-C');
+
+  });
+
+
 
 
 });

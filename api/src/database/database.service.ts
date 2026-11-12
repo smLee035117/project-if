@@ -116,6 +116,10 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy  {
             throw new Error('진행 중인 플레이는 저장할 수 없습니다.');
         }
 
+        if(playData.state === 'GIVEN_UP') {
+            throw new Error('이미 포기한 플레이는 저장할 수 없습니다.');
+        }
+
         // 2. INSERT SQL 작성
         const sql = 'INSERT INTO user_play_log (play_id, user_no, scenario_id, score, result_state, finished_at) VALUES (?, ?, ?, ?, ?, UTC_TIMESTAMP(6))';
         // 3. this.pool.execute()로 저장

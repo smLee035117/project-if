@@ -114,8 +114,7 @@ export class RedisService
       local valChk = cjson.decode(ARGV[2])
 
       if valChk.state == 'CLEARED' or
-          valChk.state == 'FAILED' or
-          valChk.state == 'GIVEN_UP' then
+          valChk.state == 'FAILED'  then
          redis.call('SET', KEYS[2], ARGV[2])
       end
 

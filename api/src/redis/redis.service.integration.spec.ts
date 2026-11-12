@@ -269,3 +269,50 @@ test('pending 결과를 조회하고 삭제 후에는 null을 반환한다', asy
       expect(getRes).toEqual(resultA);
 
 });
+
+
+test('GIVEN_UP 상태에서는 pending 결과를 생성하지 않는다', async () => {
+        // 1. 테스트용 playId 생성
+        const playId = `test-${randomUUID()}`;
+        playIds.push(playId);
+
+        // 2. 초기 PlayData 생성
+        const initial: PlayData = {
+            userId: 4,
+            userType: 0,
+            score: 100,
+            state: 'PLAYING',
+            currentStep: 0,
+            scenarioId: 'blackout_test_01',
+        };
+
+        // 3. Redis에 초기 데이터 저장
+        await service.savePlay(playId, initial);
+
+        // 4. 중도 포기 상태 생성
+        const givenUpData: PlayData = {
+            ...initial,
+            state: 'GIVEN_UP',
+        };
+
+        // 5. CAS 갱신 실행
+        const updated = await service.updatePlayIfCurrent(
+            playId,
+            initial.currentStep,
+            givenUpData,
+        );
+
+        // 6. CAS 성공 검증
+        // 직접 구현
+        expect(updated).toBe(true);
+
+        // 7. Redis 플레이 상태가 GIVEN_UP으로 변경됐는지 검증
+        // 직접 구현
+        expect(await service.getPlay(playId)).toEqual(givenUpData);
+        // 8. pending이 생성되지 않았는지 검증
+        // 직접 구현
+        expect(await service.getPendingPlayResult(playId)).toBeNull();
+
+
+    });
+

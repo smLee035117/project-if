@@ -227,4 +227,43 @@ export class PlaysService {
     }
 
 
+  async recoverPendingPlayResults(): Promise<void> {
+
+
+    const playIds = await this.redisService.scanPendingPlayIds();
+
+    for (const playId of playIds) {
+      try {
+
+
+        const pendingData =
+          await this.redisService.getPendingPlayResult(playId);
+
+        if (pendingData === null) {
+          continue;
+        }
+
+        
+
+        if('PLAYING' !== pendingData.state && 'GIVEN_UP' !== pendingData.state) {
+          await this.databaseService.savePlayResult(playId,pendingData);
+
+          await this.redisService.deletePendingPlayResult(playId);
+        
+          
+        }
+
+        
+
+      } catch (error: unknown) {
+
+        console.error(`복구 실패: ${playId}`, error);
+
+        
+      }
+    }
+  }
+
+
+
 }

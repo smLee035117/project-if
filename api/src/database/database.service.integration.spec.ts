@@ -223,3 +223,34 @@ test('동일한 playId에 서로 다른 결과를 저장하면 거절한다', as
 
 
 });
+
+
+test('GIVEN_UP 상태의 플레이 결과는 MySQL에 저장하지 않는다', async () => {
+    const playId = `test-givenup-${randomUUID()}`;
+
+    const playData: PlayData = {
+      userId: 4,
+      userType: 0,
+      score: 100,
+      state: 'GIVEN_UP',
+      currentStep: 1,
+      scenarioId: 'blackout_test_01',
+    };
+
+    // 1. savePlayResult()가 저장을 거절하는지 검증
+    await expect(
+          service.savePlayResult(playId, playData)
+    ).rejects.toThrow('이미 포기한 플레이는 저장할 수 없습니다.')
+    // 2. MySQL에서 해당 playId 조회
+    const [rows] = await verifyConnection.execute<PlayResultRow[]>(
+      `SELECT user_no, scenario_id, score, result_state
+      FROM user_play_log
+      WHERE play_id = ?`,
+      [playId],
+    );
+
+
+    // 3. 실제 저장된 결과가 0건인지 검증
+    expect(rows.length).toBe(0);
+
+});
