@@ -1,0 +1,52 @@
+{
+  "schemaVersion": 2,
+  "scenarioId": "apartment_fire_01",
+  "version": "1.0.0",
+  "title": "경보가 울린 밤",
+  "initialSceneId": "E01",
+  "initialState": {
+    "world": {
+      "incidentVariant": "Y",
+      "fireFloor": 10,
+      "insideSmoke": false
+    },
+    "player": {
+      "location": "HOME_LIVING",
+      "reported119": false
+    },
+    "knowledge": {
+      "knownFacts": [
+        "alarm_heard",
+        "no_visible_smoke_inside"
+      ]
+    }
+  },
+  "scenes": [
+    {
+      "id": "E01",
+      "description": "거실에서 화재경보가 울린다.",
+      "actions": [
+        {
+          "id": "E01-A",
+          "text": "119에 현재 상황을 신고한다.",
+          "when": {
+            "path": "player.reported119",
+            "op": "EQ",
+            "value": false
+          },
+          "effects": [
+            {
+              "type": "SET",
+              "path": "player.reported119",
+              "value": true
+            }
+          ],
+          "durationMinutes": 1,
+          "transition": {
+            "type": "STAY"
+          }
+        }
+      ]
+    }
+  ]
+}

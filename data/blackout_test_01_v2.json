@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 2,
+  "scenarioId": "blackout_v2_test_01",
+  "version": "1.0.0",
+  "title": "정전 테스트",
+  "initialSceneId": "ROOM",
+  "initialState": {
+    "world": {
+        
+    },
+    "player": {},
+    "knowledge": {
+      "knownFacts": []
+    }
+  }
+}
