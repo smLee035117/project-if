@@ -29,24 +29,47 @@
         {
           "id": "E01-A",
           "text": "119에 현재 상황을 신고한다.",
-          "when": {
-            "path": "player.reported119",
-            "op": "EQ",
-            "value": false
-          },
-          "effects": [
+          "when": [
             {
-              "type": "SET",
               "path": "player.reported119",
-              "value": true
+              "op": "EQ",
+              "value": false
             }
           ],
           "durationMinutes": 1,
-          "transition": {
-            "type": "STAY"
-          }
+          "outcomes": [
+            {
+              "when": [],
+              "resultText": "119에 현재 상황을 신고했습니다.",
+              "effects": [
+                {
+                  "type": "SET",
+                  "path": "player.reported119",
+                  "value": true
+                }
+              ],
+              "transition": {
+                "type": "STAY"
+              }
+            }
+          ]
         }
       ]
     }
-  ]
+  ],
+  "endings": [
+  {
+    "id": "TEST_DONE",
+    "state": "CLEARED",
+    "title": "테스트 종료",
+    "description": "엔딩 기능 검증용입니다.",
+    "requirements": [
+      {
+        "path": "player.reported119",
+        "op": "EQ",
+        "value": true
+      }
+    ]
+  }
+]
 }

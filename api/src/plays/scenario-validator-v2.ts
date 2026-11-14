@@ -33,6 +33,73 @@ function isStateValue(
 }
 
 
+function validateCondition(
+    condition: unknown,
+    label: string,
+    initialState: ScenarioState,
+): void {
+    // 조건 객체인지 확인
+    // path 유효성 검사
+    // 연산자별 유효성 검사
+    // 값의 자료형 검사
+    
+    // 1. condition이 객체인지 검사
+    
+    if (!isRecord(condition)) {
+        throw new Error(`${label}는 객체여야 합니다.`);
+    }
+    // 2. condition.path가 유효한 문자열인지 검사
+    if(!isNonEmptyString(condition.path)){
+        throw new Error(`${label}.path가 올바르지 않습니다.`);
+    }
+
+    // 3. condition.op가 지원하는 연산자인지 검사
+
+    switch (condition.op) {
+        case 'EQ':
+        case 'NEQ':
+            break;
+
+        case 'GT':
+        case 'GTE':
+        case 'LT':
+        case 'LTE': {
+                const checkVal = getStateValue(initialState, condition.path);
+                if(
+                    typeof checkVal !== 'number' || typeof condition.value !== 'number' 
+                ) {
+                    throw new Error(`${label}.value는 숫자여야 합니다.`);
+                }
+            }
+            break;
+
+        case 'INCLUDES': {
+                const checkVal = getStateValue(initialState, condition.path);
+
+                if (
+                    !Array.isArray(checkVal) ||
+                    typeof condition.value !== 'string'
+                ) {
+                    throw new Error(`${label}.INCLUDES 자료형이 올바르지 않습니다.`);
+                }
+
+                return;
+            }
+        default:
+            throw new Error(`${label}.op가 올바르지 않습니다.`);
+    }
+
+
+    // 5. validateStateValueType()으로 상태 필드와 자료형 비교
+    validateStateValueType(
+        initialState,
+        condition.path,
+        condition.value,
+    );
+
+
+}
+
 
 function validateStateValueType(
     state: ScenarioState,
@@ -131,6 +198,57 @@ export function validateScenarioV2(value: unknown): asserts value is ScenarioV2 
 
     validateInitialState(value.initialState);
 
+    if (!Array.isArray(value.endings) || value.endings.length === 0) {
+        throw new Error('endings는 비어 있지 않은 배열이어야 합니다.');
+    }
+
+
+    const endingIds = new Set<string>();
+
+    for (const [index, ending] of value.endings.entries()) {
+        const label = `endings[${index}]`;
+
+        if (!isRecord(ending)) {
+            throw new Error(`${label}는 객체여야 합니다.`);
+        }
+
+        if (!isNonEmptyString(ending.id)) {
+            throw new Error(`${label}.id가 올바르지 않습니다.`);
+        }
+
+        if (endingIds.has(ending.id)) {
+            throw new Error(`${label}.id가 중복되었습니다.`);
+        }
+
+        endingIds.add(ending.id);
+
+        if (ending.state !== 'CLEARED' && ending.state !== 'FAILED') {
+            throw new Error(`${label}.state가 올바르지 않습니다.`);
+        }
+
+        if (!isNonEmptyString(ending.title)) {
+            throw new Error(`${label}.title이 올바르지 않습니다.`);
+        }
+
+        if (!isNonEmptyString(ending.description)) {
+            throw new Error(`${label}.description이 올바르지 않습니다.`);
+        }
+
+        if (!Array.isArray(ending.requirements)) {
+            throw new Error(`${label}.requirements는 배열이어야 합니다.`);
+        }
+
+        for (const [reqIndex, req] of ending.requirements.entries()) {
+            const reqLabel = `${label}.requirements[${reqIndex}]`;
+
+            validateCondition (
+                req,
+                reqLabel,
+                value.initialState,
+            );
+        }
+    }
+
     if (!isNonEmptyString(value.version)) {
         throw new Error('version이 올바르지 않습니다.');
     }
@@ -189,84 +307,140 @@ export function validateScenarioV2(value: unknown): asserts value is ScenarioV2 
 
             // action.when
 
-            if(!isRecord(action.when)){
-                throw new Error(`${actionLabel}.when 은 객체여야 합니다.`);
+            if(!Array.isArray(action.when)){
+                throw new Error(`${actionLabel}.when 은 배열이어야 합니다.`);
             }
 
-            if(!isNonEmptyString(action.when.path)){
-                throw new Error(`${actionLabel}.when.path가 올바르지 않습니다.`);
+            for (const [conditionIndex, condition] of action.when.entries()) {
+                const conditionLabel = `${actionLabel}.when[${conditionIndex}]`; 
+                    validateCondition (
+                        condition,
+                        conditionLabel,
+                        value.initialState,
+                    );
+
+
             }
 
-            if(action.when.op !== 'EQ'){
-                throw new Error(`${actionLabel}.when.op가 올바르지 않습니다.`);
+            //action.outcomes
+            if (!Array.isArray(action.outcomes) || action.outcomes.length === 0) {
+                throw new Error(`${actionLabel}.outcomes 은 비어있지 않은 배열이어야 합니다.`);                
             }
-
-            const conditionValue = action.when.value;
-
-            if(typeof conditionValue !== 'string' &&
-                !(typeof conditionValue === 'number' && Number.isFinite(conditionValue)) && 
-                typeof conditionValue !== 'boolean' ){
-                throw new Error(`${actionLabel}.when.value가 올바르지 않습니다.`);
-            }
-
-            validateStateValueType(
-                value.initialState,
-                action.when.path,
-                action.when.value,
-            );
-
-
-            // action.effects
-            if (!Array.isArray(action.effects)) {
-                throw new Error(`${actionLabel}.effects는 배열이어야 합니다.`);
-            }
-
-            for (const [effectIndex, effect] of action.effects.entries()) {
-                const effectLabel = `${actionLabel}.effects[${effectIndex}]`;
-
-                if (!isRecord(effect)) {
-                    throw new Error(`${effectLabel}는 객체여야 합니다.`);
+            for (const [outcomeIndex, outcome] of action.outcomes.entries()) {
+                const outcomeLabel = `${actionLabel}.outcomes[${outcomeIndex}]`; 
+                
+                if (!isRecord(outcome)) {
+                    throw new Error(`${outcomeLabel}는 객체여야 합니다.`);
                 }
 
-                if (effect.type !== 'SET') {
-                    throw new Error(`${effectLabel}.type이 올바르지 않습니다.`);
+                if (!isNonEmptyString(outcome.resultText)) {
+                    throw new Error(`${outcomeLabel}.resultText는 비어 있지 않은 문자열이어야 합니다.`);
                 }
 
-                if (!isNonEmptyString(effect.path)) {
-                    throw new Error(`${effectLabel}.path가 올바르지 않습니다.`);
+
+                if(!Array.isArray(outcome.when)){
+                    throw new Error(`${outcomeLabel}.when 은 배열이어야 합니다.`);
                 }
 
-                const effectValue = effect.value;
+                for (const [outcomeCondiIndex, outcomeCondi] of outcome.when.entries()) {
+                    const outcomeCondiLabel = `${outcomeLabel}.when[${outcomeCondiIndex}]`; 
 
-                if (
-                    typeof effectValue !== 'string' &&
-                    typeof effectValue !== 'boolean' &&
-                    !(
-                        typeof effectValue === 'number' &&
-                        Number.isFinite(effectValue)
-                    )
-                ) {
-                    throw new Error(`${effectLabel}.value가 올바르지 않습니다.`);
+                    validateCondition (
+                        outcomeCondi,
+                        outcomeCondiLabel,
+                        value.initialState,
+                    );
+
+
                 }
 
-                validateStateValueType(
-                    value.initialState,
-                    effect.path,
-                    effect.value,
-                );
+                if(!Array.isArray(outcome.effects)){
+                    throw new Error(`${outcomeLabel}.effects 은 배열이어야 합니다.`);
+                }
+
+                for (const [outcomeEffectIndex, outcomeEffect] of outcome.effects.entries()) {
+                    const outcomeEffectLabel = `${outcomeLabel}.effects[${outcomeEffectIndex}]`; 
+
+                    if (!isRecord(outcomeEffect)) {
+                        throw new Error(`${outcomeEffectLabel}는 객체여야 합니다.`);
+                    }
+
+
+                    if (outcomeEffect.type !== 'SET') {
+                        throw new Error(`${outcomeEffectLabel}.type이 올바르지 않습니다.`);
+                    }
+
+                    if(!isNonEmptyString(outcomeEffect.path)){
+                        throw new Error(`${outcomeEffectLabel}.path가 올바르지 않습니다.`);
+                    }
+
+
+                    if(typeof outcomeEffect.value !== 'string' &&
+                        !(typeof outcomeEffect.value === 'number' && Number.isFinite(outcomeEffect.value)) && 
+                        typeof outcomeEffect.value !== 'boolean' ){
+                            throw new Error(`${outcomeEffectLabel}.value가 올바르지 않습니다.`);
+                    }
+
+                    // 5. validateStateValueType()으로 상태 필드와 자료형 비교
+                    validateStateValueType(
+                        value.initialState,
+                        outcomeEffect.path,
+                        outcomeEffect.value,
+                    );
+
+
+
+                }
+
+
+                //outcome.transition
+                if (!isRecord(outcome.transition)) {
+                        throw new Error(`${outcomeLabel}는 객체여야 합니다.`);
+                }
+
+
+
+                if(outcome.transition.type !== 'STAY' &&
+                    outcome.transition.type !== 'GOTO' &&
+                    outcome.transition.type !== 'END' ){
+                        throw new Error(`${outcomeLabel}.transition.type이 올바르지 않습니다.`);
+                }
+
+                if (outcome.transition.type === 'GOTO') {
+                    const sceneId = outcome.transition.sceneId;
+
+                    if (!isNonEmptyString(sceneId)) {
+                        throw new Error(`${outcomeLabel}.transition.sceneId가 올바르지 않습니다.`);
+                    }
+
+                    const exists = value.scenes.some(
+                        (scene) => isRecord(scene) && scene.id === sceneId
+                    );
+
+                    if (!exists) {
+                        throw new Error(`${outcomeLabel}.transition.sceneId에 해당하는 장면이 없습니다.`);
+                    }
+                }
+
+                if (outcome.transition.type === 'END') {
+                    const endingId = outcome.transition.endingId;
+
+                    if (!isNonEmptyString(endingId)) {
+                        throw new Error(`${outcomeLabel}.transition.endingId가 올바르지 않습니다.`);
+                    }
+
+                    const exists = value.endings.some(
+                        (ending) => isRecord(ending) && ending.id === endingId
+                    );
+
+                    if (!exists) {
+                        throw new Error(`${outcomeLabel}.transition.endingId에 해당하는 엔딩이 없습니다.`);
+                    }
+                }
+
+
 
             }
-
-            // action.transition
-            if (!isRecord(action.transition)) {
-                throw new Error(`${actionLabel}.transition은 객체여야 합니다.`);
-            }
-
-            if (action.transition.type !== 'STAY') {
-                throw new Error(`${actionLabel}.transition.type이 올바르지 않습니다.`);
-            }
-
-
 
 
         }

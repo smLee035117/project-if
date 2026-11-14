@@ -18,4 +18,5 @@ export interface PlayDataV2 extends PlayData {
     scenarioVersion: string;
     storyTimeMinutes: number;
     scenarioState: ScenarioState;
+    endingId?: string;
 }
