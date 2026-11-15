@@ -109,6 +109,20 @@ describe('buildPlayViewV2', () => {
                 available: false,
             },
         ]);
+
+        expect(view.version).toBe(0);
+
+    });
+
+    it('변경된 플레이 버전을 조회 응답에 반영한다', () => {
+        const playData = createInitialPlayDataV2(scenario, 1, 0);
+
+        playData.version = 3;
+
+        const view = buildPlayViewV2(playData, scenario);
+
+        expect(view.version).toBe(3);
+        expect(playData.version).toBe(3);
     });
 
     it('비공개 상태와 행동 결과를 응답에 포함하지 않는다', () => {

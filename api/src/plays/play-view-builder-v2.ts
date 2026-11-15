@@ -81,6 +81,7 @@ export function buildPlayViewV2(
         scenarioId: scenario.scenarioId,
         scenarioTitle: scenario.title,
         state: playData.state,
+        version: playData.version,
         currentSceneId: scene.id,
         sceneDescription: scene.description,
         storyTimeMinutes: playData.storyTimeMinutes,

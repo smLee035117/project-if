@@ -11,6 +11,7 @@ export type PlayViewV2 = {
     scenarioId: string;
     scenarioTitle: string;
     state: PlayDataV2['state'];
+    version: number;
 
     currentSceneId: string;
     sceneDescription: string;
