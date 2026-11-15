@@ -158,5 +158,88 @@ describe('validateScenarioV2', () => {
 
         expect(() => validateScenarioV2(scenario)).toThrow();
     });
+
+
+
+    // 신규 EffectV2 검증 테스트
+    function validateWithEffect(effect: unknown): void {
+        const scenario = loadTestScenario() as ScenarioV2;
+        const outcome = scenario.scenes[0]?.actions[0]?.outcomes[0];
+
+        if (!outcome) {
+            throw new Error('테스트용 outcome이 없습니다.');
+        }
+
+        outcome.effects = [
+            effect as (typeof outcome.effects)[number],
+        ];
+
+        validateScenarioV2(scenario);
+    }
+
+    it('ADD 숫자 효과를 허용한다', () => {
+        expect(() => validateWithEffect({
+            type: 'ADD',
+            path: 'world.fireFloor',
+            value: 2,
+        })).not.toThrow();
+    });
+
+    it('ADD 대상이 숫자가 아니면 거부한다', () => {
+        expect(() => validateWithEffect({
+            type: 'ADD',
+            path: 'player.reported119',
+            value: 1,
+        })).toThrow();
+    });
+
+    it('ADD 변경값이 숫자가 아니면 거부한다', () => {
+        expect(() => validateWithEffect({
+            type: 'ADD',
+            path: 'world.fireFloor',
+            value: '2',
+        })).toThrow();
+    });
+
+    it('APPEND_UNIQUE 효과를 허용한다', () => {
+        expect(() => validateWithEffect({
+            type: 'APPEND_UNIQUE',
+            path: 'knowledge.knownFacts',
+            value: 'smoke_seen',
+        })).not.toThrow();
+    });
+
+    it('REMOVE 효과를 허용한다', () => {
+        expect(() => validateWithEffect({
+            type: 'REMOVE',
+            path: 'knowledge.knownFacts',
+            value: 'alarm_heard',
+        })).not.toThrow();
+    });
+
+    it('APPEND_UNIQUE의 잘못된 경로를 거부한다', () => {
+        expect(() => validateWithEffect({
+            type: 'APPEND_UNIQUE',
+            path: 'player.location',
+            value: 'smoke_seen',
+        })).toThrow();
+    });
+
+    it('REMOVE의 숫자 값을 거부한다', () => {
+        expect(() => validateWithEffect({
+            type: 'REMOVE',
+            path: 'knowledge.knownFacts',
+            value: 123,
+        })).toThrow();
+    });
+
+    it('지원하지 않는 효과 연산자를 거부한다', () => {
+        expect(() => validateWithEffect({
+            type: 'MULTIPLY',
+            path: 'world.fireFloor',
+            value: 2,
+        })).toThrow();
+    });
+
     
 });

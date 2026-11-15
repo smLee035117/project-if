@@ -358,38 +358,64 @@ export function validateScenarioV2(value: unknown): asserts value is ScenarioV2 
                     throw new Error(`${outcomeLabel}.effects 은 배열이어야 합니다.`);
                 }
 
+                
                 for (const [outcomeEffectIndex, outcomeEffect] of outcome.effects.entries()) {
-                    const outcomeEffectLabel = `${outcomeLabel}.effects[${outcomeEffectIndex}]`; 
+                    const effectLabel = `${outcomeLabel}.effects[${outcomeEffectIndex}]`;
 
                     if (!isRecord(outcomeEffect)) {
-                        throw new Error(`${outcomeEffectLabel}는 객체여야 합니다.`);
+                        throw new Error(`${effectLabel}는 객체여야 합니다.`);
                     }
 
-
-                    if (outcomeEffect.type !== 'SET') {
-                        throw new Error(`${outcomeEffectLabel}.type이 올바르지 않습니다.`);
+                    if (!isNonEmptyString(outcomeEffect.path)) {
+                        throw new Error(`${effectLabel}.path가 올바르지 않습니다.`);
                     }
 
-                    if(!isNonEmptyString(outcomeEffect.path)){
-                        throw new Error(`${outcomeEffectLabel}.path가 올바르지 않습니다.`);
+                    switch (outcomeEffect.type) {
+                        case 'SET': {
+                            validateStateValueType(
+                                value.initialState,
+                                outcomeEffect.path,
+                                outcomeEffect.value,
+                            );
+                            break;
+                        }
+
+                        case 'ADD': {
+                            if (
+                                typeof outcomeEffect.value !== 'number' ||
+                                !Number.isFinite(outcomeEffect.value)
+                            ) {
+                                throw new Error(`${effectLabel}.value는 유한한 숫자여야 합니다.`);
+                            }
+
+                            const currentValue = getStateValue(
+                                value.initialState,
+                                outcomeEffect.path,
+                            );
+
+                            if (typeof currentValue !== 'number') {
+                                throw new Error(`${effectLabel}.ADD 대상은 숫자여야 합니다.`);
+                            }
+
+                            break;
+                        }
+
+                        case 'APPEND_UNIQUE':
+                        case 'REMOVE': {
+                            if (outcomeEffect.path !== 'knowledge.knownFacts') {
+                                throw new Error(`${effectLabel}.path가 올바르지 않습니다.`);
+                            }
+
+                            if (!isNonEmptyString(outcomeEffect.value)) {
+                                throw new Error(`${effectLabel}.value는 문자열이어야 합니다.`);
+                            }
+
+                            break;
+                        }
+
+                        default:
+                            throw new Error(`${effectLabel}.type이 올바르지 않습니다.`);
                     }
-
-
-                    if(typeof outcomeEffect.value !== 'string' &&
-                        !(typeof outcomeEffect.value === 'number' && Number.isFinite(outcomeEffect.value)) && 
-                        typeof outcomeEffect.value !== 'boolean' ){
-                            throw new Error(`${outcomeEffectLabel}.value가 올바르지 않습니다.`);
-                    }
-
-                    // 5. validateStateValueType()으로 상태 필드와 자료형 비교
-                    validateStateValueType(
-                        value.initialState,
-                        outcomeEffect.path,
-                        outcomeEffect.value,
-                    );
-
-
-
                 }
 
 

@@ -52,11 +52,28 @@ export type ConditionV2 = {
 
 
 
-export type EffectV2 = {
-    type: 'SET';
-    path: string;
-    value: string | number | boolean;
-};
+
+export type EffectV2 =
+  | {
+      type: 'SET';
+      path: string;
+      value: string | number | boolean;
+    }
+  | {
+      type: 'ADD';
+      path: string;
+      value: number;
+    }
+  | {
+      type: 'APPEND_UNIQUE';
+      path: 'knowledge.knownFacts';
+      value: string;
+    }
+  | {
+      type: 'REMOVE';
+      path: 'knowledge.knownFacts';
+      value: string;
+    };
 
 export type TransitionV2 =
   | { type: 'STAY' }

@@ -453,4 +453,160 @@ describe('INCLUDES 조건 평가', () => {
             value: 123,
         })).toThrow();
     });
+
+
+
+});
+
+    test('ADD는 숫자 상태를 변경하고 원본을 유지한다', () => {
+        const original = structuredClone(playDataV2.scenarioState);
+
+        const result = applyEffect(original, [
+            {
+                type: 'ADD',
+                path: 'world.fireFloor',
+                value: -3,
+            },
+        ]);
+
+        expect(result.world.fireFloor).toBe(7);
+        expect(original.world.fireFloor).toBe(10);
+        expect(result).not.toBe(original);
+    });
+
+    test('ADD 대상이 숫자가 아니면 거부한다', () => {
+        const original = structuredClone(playDataV2.scenarioState);
+
+        expect(() => applyEffect(original, [
+            {
+                type: 'ADD',
+                path: 'player.reported119',
+                value: 1,
+            },
+        ])).toThrow();
+
+        expect(original.player.reported119).toBe(false);
+    });
+
+    test('ADD 계산 결과가 무한대이면 거부한다', () => {
+        const original = structuredClone(playDataV2.scenarioState);
+
+        original.world.fireFloor = Number.MAX_VALUE;
+
+        expect(() => applyEffect(original, [
+            {
+                type: 'ADD',
+                path: 'world.fireFloor',
+                value: Number.MAX_VALUE,
+            },
+        ])).toThrow();
+
+        expect(original.world.fireFloor).toBe(Number.MAX_VALUE);
+    });
+
+
+
+
+test('APPEND_UNIQUE는 새로운 정보를 추가한다', () => {
+    const original = structuredClone(playDataV2.scenarioState);
+
+    const result = applyEffect(original, [
+        {
+            type: 'APPEND_UNIQUE',
+            path: 'knowledge.knownFacts',
+            value: 'smoke_seen',
+        },
+    ]);
+
+    expect(result.knowledge.knownFacts).toEqual([
+        'alarm_heard',
+        'smoke_seen',
+    ]);
+
+    expect(original.knowledge.knownFacts).toEqual([
+        'alarm_heard',
+    ]);
+});
+
+test('APPEND_UNIQUE는 중복 정보를 추가하지 않는다', () => {
+    const original = structuredClone(playDataV2.scenarioState);
+
+    const result = applyEffect(original, [
+        {
+            type: 'APPEND_UNIQUE',
+            path: 'knowledge.knownFacts',
+            value: 'alarm_heard',
+        },
+    ]);
+
+    expect(result.knowledge.knownFacts).toEqual([
+        'alarm_heard',
+    ]);
+});
+
+test('REMOVE는 기존 정보를 삭제한다', () => {
+    const original = structuredClone(playDataV2.scenarioState);
+
+    const result = applyEffect(original, [
+        {
+            type: 'REMOVE',
+            path: 'knowledge.knownFacts',
+            value: 'alarm_heard',
+        },
+    ]);
+
+    expect(result.knowledge.knownFacts).toEqual([]);
+    expect(original.knowledge.knownFacts).toEqual([
+        'alarm_heard',
+    ]);
+});
+
+test('REMOVE는 존재하지 않는 정보를 삭제해도 오류가 없다', () => {
+    const original = structuredClone(playDataV2.scenarioState);
+
+    const result = applyEffect(original, [
+        {
+            type: 'REMOVE',
+            path: 'knowledge.knownFacts',
+            value: 'not_found',
+        },
+    ]);
+
+    expect(result.knowledge.knownFacts).toEqual([
+        'alarm_heard',
+    ]);
+});
+
+test('여러 효과를 순서대로 적용하고 원본은 유지한다', () => {
+    const original = structuredClone(playDataV2.scenarioState);
+
+    const result = applyEffect(original, [
+        {
+            type: 'APPEND_UNIQUE',
+            path: 'knowledge.knownFacts',
+            value: 'smoke_seen',
+        },
+        {
+            type: 'REMOVE',
+            path: 'knowledge.knownFacts',
+            value: 'alarm_heard',
+        },
+        {
+            type: 'ADD',
+            path: 'world.fireFloor',
+            value: 2,
+        },
+    ]);
+
+    expect(result.knowledge.knownFacts).toEqual([
+        'smoke_seen',
+    ]);
+
+    expect(result.world.fireFloor).toBe(12);
+
+    expect(original.knowledge.knownFacts).toEqual([
+        'alarm_heard',
+    ]);
+
+    expect(original.world.fireFloor).toBe(10);
 });

@@ -134,7 +134,43 @@ export function applyEffect(
     const nextState = structuredClone(state);
 
     for(const effect of effects) {
-        if (effect.type !== 'SET') {
+
+        if (effect.type === 'APPEND_UNIQUE') {
+            if (
+                effect.path !== 'knowledge.knownFacts' ||
+                typeof effect.value !== 'string' ||
+                effect.value.trim().length === 0
+            ) {
+                throw new Error('APPEND_UNIQUE 효과가 올바르지 않습니다.');
+            }
+
+            const knownFacts = nextState.knowledge.knownFacts;
+
+            if (!knownFacts.includes(effect.value)) {
+                knownFacts.push(effect.value);
+            }
+
+            continue;
+        }
+
+        if (effect.type === 'REMOVE') {
+            if (
+                effect.path !== 'knowledge.knownFacts' ||
+                typeof effect.value !== 'string' ||
+                effect.value.trim().length === 0
+            ) {
+                throw new Error('REMOVE 효과가 올바르지 않습니다.');
+            }
+
+            nextState.knowledge.knownFacts =
+                nextState.knowledge.knownFacts.filter(
+                    (fact) => fact !== effect.value,
+                );
+
+            continue;
+        }
+
+        if (effect.type !== 'SET' && effect.type !== 'ADD') {
             throw new Error('지원하지 않는 처리입니다.');
         }
     
@@ -156,9 +192,30 @@ export function applyEffect(
             throw new Error(`value 범위가 올바르지 않습니다.`);
         }
 
-         nextState[section][key] = effect.value;
+        // SET 일때
+        if(effect.type === 'SET') { 
+            nextState[section][key] = effect.value;
+        }
+        
 
+        // ADD 일때
+        if (effect.type === 'ADD') {
+            if (
+                typeof currentValue !== 'number' ||
+                typeof effect.value !== 'number'
+            ) {
+                throw new Error('ADD는 숫자 상태에만 사용할 수 있습니다.');
+            }
 
+            const result = currentValue + effect.value;
+
+            if (!Number.isFinite(result)) {
+                throw new Error('ADD 계산 결과가 올바르지 않습니다.');
+            }
+
+            nextState[section][key] = result;
+        }
+            
 
         
     }
