@@ -6,6 +6,11 @@ import { RedisService } from './redis.service.js';
 import type { PlayData } from '../plays/types/play.js';
 import e from 'express';
 
+import { createInitialPlayDataV2 } from '../plays/play-engine-v2.js';
+import { loadScenarioV2 } from '../plays/scenario-loader-v2.js';
+
+import { executeActionV2 } from '../plays/action-engine-v2.js';
+
 const service = new RedisService();
 
 // 테스트 데이터 삭제용 연결
@@ -27,6 +32,7 @@ afterAll(async () => {
       for (const id of playIds) {
         await cleanupClient.del([
           `play:${id}`,
+          `play:v2:${id}`,
           `pending:play-result:${id}`,
         ]);
       }
@@ -316,3 +322,155 @@ test('GIVEN_UP 상태에서는 pending 결과를 생성하지 않는다', async 
 
     });
 
+    test('V2 플레이를 별도 키에 저장하고 조회한다', async () => {
+        const playId = `test-${randomUUID()}`;
+        playIds.push(playId);
+
+        const scenario = await loadScenarioV2('apartment_fire_01');
+
+        const initial = createInitialPlayDataV2(
+            scenario,
+            4,
+            0,
+        );
+
+        await service.savePlayV2(playId, initial);
+
+        const saved = await service.getPlayV2(playId);
+
+        expect(saved).toEqual(initial);
+
+        // V1 저장 영역과 분리되었는지 검증
+        expect(await service.getPlay(playId)).toBeNull();
+
+        // TTL이 설정되었는지 검증
+        const ttl = await cleanupClient.ttl(`play:v2:${playId}`);
+
+        expect(ttl).toBeGreaterThan(0);
+        expect(ttl).toBeLessThanOrEqual(3600);
+    });
+
+    test('V2 플레이 생성 시 기존 데이터를 덮어쓰지 않는다', async () => {
+        const playId = `test-${randomUUID()}`;
+        playIds.push(playId);
+
+        const scenario = await loadScenarioV2('apartment_fire_01');
+        const initial = createInitialPlayDataV2(scenario, 4, 0);
+
+        await service.savePlayV2(playId, initial);
+
+        const modified = {
+            ...initial,
+            version: 1,
+        };
+
+        await expect(
+            service.savePlayV2(playId, modified),
+        ).rejects.toThrow('이미 존재하는 V2 플레이 ID입니다.');
+
+        expect(await service.getPlayV2(playId)).toEqual(initial);
+    });
+
+
+    test('V2 행동 결과를 버전 기준으로 저장한다', async () => {
+      const playId = `test-${randomUUID()}`;
+      playIds.push(playId);
+
+      const scenario =
+        await loadScenarioV2('apartment_fire_01');
+
+      const initial =
+        createInitialPlayDataV2(scenario, 4, 0);
+
+      const next = executeActionV2(
+        initial,
+        scenario,
+        'E01-A',
+      ).playData;
+
+      await service.savePlayV2(playId, initial);
+
+      expect(
+        await service.updatePlayV2IfVersion(
+          playId,
+          0,
+          next,
+        ),
+      ).toBe(true);
+
+      expect(await service.getPlayV2(playId))
+        .toEqual(next);
+    });
+
+    test('V2에서 이전 버전 요청은 저장을 거부한다', async () => {
+      const playId = `test-${randomUUID()}`;
+      playIds.push(playId);
+
+      const scenario =
+        await loadScenarioV2('apartment_fire_01');
+
+      const initial =
+        createInitialPlayDataV2(scenario, 4, 0);
+
+      const next = executeActionV2(
+        initial,
+        scenario,
+        'E01-A',
+      ).playData;
+
+      await service.savePlayV2(playId, initial);
+
+      expect(
+        await service.updatePlayV2IfVersion(
+          playId, 0, next,
+        ),
+      ).toBe(true);
+
+      expect(
+        await service.updatePlayV2IfVersion(
+          playId, 0, next,
+        ),
+      ).toBe(false);
+
+      expect(await service.getPlayV2(playId))
+        .toEqual(next);
+    });
+
+    test('V2 동시 요청 중 정확히 하나만 저장된다', async () => {
+      const playId = `test-${randomUUID()}`;
+      playIds.push(playId);
+
+      const scenario =
+        await loadScenarioV2('apartment_fire_01');
+
+      const initial =
+        createInitialPlayDataV2(scenario, 4, 0);
+
+      const nextA = {
+        ...initial,
+        version: 1,
+        storyTimeMinutes: 1,
+      };
+
+      const nextB = {
+        ...initial,
+        version: 1,
+        storyTimeMinutes: 2,
+      };
+
+      await service.savePlayV2(playId, initial);
+
+      const [resultA, resultB] = await Promise.all([
+        service.updatePlayV2IfVersion(
+          playId, 0, nextA,
+        ),
+        service.updatePlayV2IfVersion(
+          playId, 0, nextB,
+        ),
+      ]);
+
+      expect(resultA).not.toBe(resultB);
+
+      expect(await service.getPlayV2(playId))
+        .toEqual(resultA ? nextA : nextB);
+    });

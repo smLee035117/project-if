@@ -6,11 +6,11 @@ import { PlayRecoveryBootstrapService } from './play-recovery-bootstrap.service.
 import { DatabaseModule } from '../database/database.module.js';
 import { RedisModule } from '../redis/redis.module.js';
 
-
+import { PlaysV2Controller } from './plays-v2.controller.js';
 
 @Module({
   imports: [DatabaseModule , RedisModule],
-  controllers: [PlaysController],
+  controllers: [PlaysController, PlaysV2Controller,],
   providers: [PlaysService,PlayRecoveryBootstrapService]
 })
 export class PlaysModule {}

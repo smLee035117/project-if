@@ -8,6 +8,10 @@ import { createClient } from 'redis';
 
 import type { PlayData } from '../plays/types/play.js';
 
+import type { PlayDataV2 } from '../plays/types/play-v2.js';
+
+
+
 @Injectable()
 export class RedisService
   implements OnModuleInit, OnModuleDestroy {
@@ -167,6 +171,101 @@ export class RedisService
 
       return [...playIds];
 
+  }
+
+
+  async savePlayV2(
+      playId: string,
+      data: PlayDataV2,
+  ): Promise<void> {
+      const key = `play:v2:${playId}`;
+
+      const result = await this.client.set(
+          key,
+          JSON.stringify(data),
+          {
+              EX: 3600,
+              NX: true,
+          },
+      );
+
+      if (result !== 'OK') {
+          throw new Error('이미 존재하는 V2 플레이 ID입니다.');
+      }
+  }
+
+  async getPlayV2(
+      playId: string,
+  ): Promise<PlayDataV2 | null> {
+      const value = await this.client.get(`play:v2:${playId}`);
+
+      if (value === null) {
+          return null;
+      }
+
+      return JSON.parse(value) as PlayDataV2;
+  }
+
+
+
+  async updatePlayV2IfVersion(
+    playId: string,
+    expectedVersion: number,
+    nextData: PlayDataV2,
+  ): Promise<boolean> {
+    if (
+      !Number.isSafeInteger(expectedVersion) ||
+      expectedVersion < 0 ||
+      nextData.version !== expectedVersion + 1
+    ) {
+      throw new Error('V2 플레이 버전이 올바르지 않습니다.');
+    }
+
+    const key = `play:v2:${playId}`;
+
+    const script = `
+      local value = redis.call('GET', KEYS[1])
+
+      if not value then
+        return 0
+      end
+
+      local current = cjson.decode(value)
+
+      if current.state ~= 'PLAYING' then
+        return 0
+      end
+
+      if current.version ~= tonumber(ARGV[1]) then
+        return 0
+      end
+
+      local nextData = cjson.decode(ARGV[2])
+
+      if nextData.version ~= current.version + 1 then
+        return redis.error_reply('Invalid next version')
+      end
+
+      if current.userId ~= nextData.userId or
+        current.scenarioId ~= nextData.scenarioId or
+        current.scenarioVersion ~= nextData.scenarioVersion then
+        return redis.error_reply('Play identity mismatch')
+      end
+
+      redis.call('SET', KEYS[1], ARGV[2], 'EX', 3600)
+
+      return 1
+    `;
+
+    const result = await this.client.eval(script, {
+      keys: [key],
+      arguments: [
+        String(expectedVersion),
+        JSON.stringify(nextData),
+      ],
+    });
+
+    return result === 1;
   }
 
 }

@@ -15,6 +15,16 @@ import {
 import { createPlayId } from './play-id.js';
 
 
+import { loadScenarioV2 } from './scenario-loader-v2.js';
+import { createInitialPlayDataV2 } from './play-engine-v2.js';
+import { buildPlayViewV2 } from './play-view-builder-v2.js';
+
+import type { ScenarioV2 } from './types/scenario-v2.js';
+import type { PlayDataV2 } from './types/play-v2.js';
+import type { PlayViewV2 } from './types/play-view-v2.js';
+
+import { executeActionV2 } from './action-engine-v2.js';
+
 
 @Injectable()
 export class PlaysService {
@@ -264,6 +274,209 @@ export class PlaysService {
     }
   }
 
+
+    private async loadScenarioV2ForApi(
+    scenarioId: string,
+  ): Promise<ScenarioV2> {
+    try {
+      return await loadScenarioV2(scenarioId);
+    } catch (error: unknown) {
+      if (error instanceof ScenarioNotFoundError) {
+        throw new NotFoundException(
+          'V2 시나리오를 찾을 수 없습니다.',
+        );
+      }
+
+      throw error;
+    }
+  }
+
+  async startPlayV2(
+    scenarioId: string,
+    guestToken?: string,
+  ): Promise<{
+    playId: string;
+    view: PlayViewV2;
+    newToken: string | null;
+  }> {
+    // 시나리오 검증
+    const scenario =
+      await this.loadScenarioV2ForApi(scenarioId);
+
+    // 기존 게스트 인증 구조 재사용
+    const { userId, newToken } =
+      await this.getOrCreateGuest(guestToken);
+
+    // V2 초기 상태 생성
+    const playData = createInitialPlayDataV2(
+      scenario,
+      userId,
+      0,
+    );
+
+    // 외부 공개 데이터 구성
+    const view = buildPlayViewV2(playData, scenario);
+
+    // Redis에 V2 데이터 저장
+    const playId = createPlayId();
+
+    await this.redisService.savePlayV2(
+      playId,
+      playData,
+    );
+
+    return {
+      playId,
+      view,
+      newToken,
+    };
+  }
+
+  async getPlayDataV2ForGuest(
+    playId: string,
+    guestToken?: string,
+  ): Promise<PlayDataV2> {
+    if (
+      !guestToken ||
+      !/^[0-9a-f]{64}$/.test(guestToken)
+    ) {
+      throw new UnauthorizedException(
+        '게스트 인증이 필요합니다.',
+      );
+    }
+
+    const tokenHash = hashGuestToken(guestToken);
+
+    const userId =
+      await this.databaseService.findGuestUserId(
+        tokenHash,
+      );
+
+    if (userId === null) {
+      throw new UnauthorizedException(
+        '유효하지 않은 게스트 세션입니다.',
+      );
+    }
+
+    const playData =
+      await this.redisService.getPlayV2(playId);
+
+    // 존재 여부와 소유권을 함께 확인
+    if (
+      playData === null ||
+      playData.userId !== userId
+    ) {
+      throw new NotFoundException(
+        '플레이를 찾을 수 없습니다.',
+      );
+    }
+
+    return playData;
+  }
+
+  async getPlayViewV2ForGuest(
+    playId: string,
+    guestToken?: string,
+  ): Promise<PlayViewV2> {
+    const playData =
+      await this.getPlayDataV2ForGuest(
+        playId,
+        guestToken,
+      );
+
+    const scenario =
+      await this.loadScenarioV2ForApi(
+        playData.scenarioId,
+      );
+
+    return buildPlayViewV2(
+      playData,
+      scenario,
+    );
+  }
+
+  async submitActionV2(
+    playId: string,
+    actionId: string,
+    expectedVersion: number,
+    guestToken?: string,
+  ): Promise<{
+    resultText: string;
+    view: PlayViewV2;
+  }> {
+    const playData =
+      await this.getPlayDataV2ForGuest(
+        playId,
+        guestToken,
+      );
+
+    if (
+      playData.version !== expectedVersion ||
+      playData.state !== 'PLAYING'
+    ) {
+      throw new ConflictException(
+        '플레이 상태가 변경되었습니다. 다시 조회해 주세요.',
+      );
+    }
+
+    const scenario =
+      await this.loadScenarioV2ForApi(
+        playData.scenarioId,
+      );
+
+    // 공개 조회 결과를 이용해 행동 존재 여부와
+    // 실행 가능 여부를 먼저 검사합니다.
+    const currentView = buildPlayViewV2(
+      playData,
+      scenario,
+    );
+
+    const action = currentView.actions.find(
+      (item) => item.id === actionId,
+    );
+
+    if (!action) {
+      throw new BadRequestException(
+        '현재 장면에 존재하지 않는 행동입니다.',
+      );
+    }
+
+    if (!action.available) {
+      throw new ConflictException(
+        '현재 상태에서 실행할 수 없는 행동입니다.',
+      );
+    }
+
+    const result = executeActionV2(
+      playData,
+      scenario,
+      actionId,
+    );
+
+    // 저장 전에 응답 생성까지 검증합니다.
+    const nextView = buildPlayViewV2(
+      result.playData,
+      scenario,
+    );
+
+    const updated =
+      await this.redisService.updatePlayV2IfVersion(
+        playId,
+        expectedVersion,
+        result.playData,
+      );
+
+    if (!updated) {
+      throw new ConflictException(
+        '플레이 상태가 변경되었거나 만료되었습니다. 다시 조회해 주세요.',
+      );
+    }
+
+    return {
+      resultText: result.resultText,
+      view: nextView,
+    };
+  }
 
 
 }
