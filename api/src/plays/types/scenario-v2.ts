@@ -9,8 +9,20 @@ export interface ScenarioV2 {
   initialState: ScenarioState;
    scenes: SceneV2[];
    endings: EndingV2[];
+   timeEvents?: TimeEventV2[];
   
 }
+
+
+
+export type TimeEventV2 = {
+    id: string;
+    atMinute: number;
+    when: ConditionV2[];
+    effects: EffectV2[];
+};
+
+
 
 export type EndingV2 = {
     id : string;

@@ -241,5 +241,159 @@ describe('validateScenarioV2', () => {
         })).toThrow();
     });
 
+
+
+    // 시간 이벤트 검증용 시나리오
+    function createTimeEventScenario(): ScenarioV2 {
+        const scenario = loadTestScenario() as ScenarioV2;
+
+        scenario.timeEvents = [
+            {
+                id: 'SMOKE_SPREAD',
+                atMinute: 3,
+                when: [
+                    {
+                        path: 'world.insideSmoke',
+                        op: 'EQ',
+                        value: false,
+                    },
+                ],
+                effects: [
+                    {
+                        type: 'SET',
+                        path: 'world.insideSmoke',
+                        value: true,
+                    },
+                ],
+            },
+        ];
+
+        return scenario;
+    }
+
+    it('정상적인 시간 이벤트를 허용한다', () => {
+        const scenario = createTimeEventScenario();
+
+        expect(() => validateScenarioV2(scenario)).not.toThrow();
+    });
+
+    it('timeEvents가 빈 배열이어도 허용한다', () => {
+        const scenario = createTimeEventScenario();
+        scenario.timeEvents = [];
+
+        expect(() => validateScenarioV2(scenario)).not.toThrow();
+    });
+
+    it('timeEvents가 배열이 아니면 거부한다', () => {
+        const scenario = {
+            ...createTimeEventScenario(),
+            timeEvents: 'invalid',
+        };
+
+        expect(() => validateScenarioV2(scenario))
+            .toThrow('timeEvents는 배열이어야 합니다.');
+    });
+
+    it('시간 이벤트 ID가 중복되면 거부한다', () => {
+        const scenario = createTimeEventScenario();
+
+        scenario.timeEvents!.push({
+            id: 'SMOKE_SPREAD',
+            atMinute: 5,
+            when: [],
+            effects: [
+                {
+                    type: 'SET',
+                    path: 'world.insideSmoke',
+                    value: true,
+                },
+            ],
+        });
+
+        expect(() => validateScenarioV2(scenario))
+            .toThrow('id가 중복되었습니다.');
+    });
+
+    it('0분에 발생하는 이벤트를 거부한다', () => {
+        const scenario = createTimeEventScenario();
+
+        scenario.timeEvents![0]!.atMinute = 0;
+
+        expect(() => validateScenarioV2(scenario))
+            .toThrow('atMinute가 올바르지 않습니다.');
+    });
+
+    it('무한대 시간값을 거부한다', () => {
+        const scenario = createTimeEventScenario();
+
+        scenario.timeEvents![0]!.atMinute = Infinity;
+
+        expect(() => validateScenarioV2(scenario))
+            .toThrow('atMinute가 올바르지 않습니다.');
+    });
+
+    it('존재하지 않는 상태 조건을 거부한다', () => {
+        const scenario = createTimeEventScenario();
+
+        scenario.timeEvents![0]!.when = [
+            {
+                path: 'world.notFound',
+                op: 'EQ',
+                value: true,
+            },
+        ];
+
+        expect(() => validateScenarioV2(scenario)).toThrow();
+    });
+
+    it('시간 이벤트의 효과 자료형이 다르면 거부한다', () => {
+        const scenario = createTimeEventScenario();
+
+        scenario.timeEvents![0]!.effects = [
+            {
+                type: 'SET',
+                path: 'world.insideSmoke',
+                value: 123,
+            },
+        ];
+
+        expect(() => validateScenarioV2(scenario))
+            .toThrow('값 형식이 다릅니다.');
+    });
+
+    it('시간 이벤트가 knownFacts를 직접 변경하면 거부한다', () => {
+        const scenario = createTimeEventScenario();
+
+        scenario.timeEvents![0]!.effects = [
+            {
+                type: 'APPEND_UNIQUE',
+                path: 'knowledge.knownFacts',
+                value: 'smoke_seen',
+            },
+        ];
+
+        expect(() => validateScenarioV2(scenario))
+            .toThrow('지식 정보를 직접 변경할 수 없습니다.');
+    });
+
+    it('동일 시각에 서로 다른 이벤트가 발생하는 것은 허용한다', () => {
+        const scenario = createTimeEventScenario();
+
+        scenario.timeEvents!.push({
+            id: 'DANGER_INCREASE',
+            atMinute: 3,
+            when: [],
+            effects: [
+                {
+                    type: 'ADD',
+                    path: 'world.fireFloor',
+                    value: 1,
+                },
+            ],
+        });
+
+        expect(() => validateScenarioV2(scenario)).not.toThrow();
+    });
+
     
 });

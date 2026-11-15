@@ -124,6 +124,71 @@ function validateStateValueType(
     }
 }
 
+
+
+function validateEffect(
+    effect: unknown,
+    label: string,
+    initialState: ScenarioState,
+): void {
+    if (!isRecord(effect)) {
+        throw new Error(`${label}는 객체여야 합니다.`);
+    }
+
+    if (!isNonEmptyString(effect.path)) {
+        throw new Error(`${label}.path가 올바르지 않습니다.`);
+    }
+
+    switch (effect.type) {
+        case 'SET': {
+            validateStateValueType(
+                initialState,
+                effect.path,
+                effect.value,
+            );
+            break;
+        }
+
+        case 'ADD': {
+            if (
+                typeof effect.value !== 'number' ||
+                !Number.isFinite(effect.value)
+            ) {
+                throw new Error(`${label}.value는 유한한 숫자여야 합니다.`);
+            }
+
+            const currentValue = getStateValue(
+                initialState,
+                effect.path,
+            );
+
+            if (typeof currentValue !== 'number') {
+                throw new Error(`${label}.ADD 대상은 숫자여야 합니다.`);
+            }
+
+            break;
+        }
+
+        case 'APPEND_UNIQUE':
+        case 'REMOVE': {
+            if (effect.path !== 'knowledge.knownFacts') {
+                throw new Error(`${label}.path가 올바르지 않습니다.`);
+            }
+
+            if (!isNonEmptyString(effect.value)) {
+                throw new Error(`${label}.value는 문자열이어야 합니다.`);
+            }
+
+            break;
+        }
+
+        default:
+            throw new Error(`${label}.type이 올바르지 않습니다.`);
+    }
+}
+
+
+
 function validateStateMap(
     value: unknown,
     label: string,
@@ -197,6 +262,77 @@ export function validateScenarioV2(value: unknown): asserts value is ScenarioV2 
 
 
     validateInitialState(value.initialState);
+
+
+
+if (value.timeEvents !== undefined) {
+    if (!Array.isArray(value.timeEvents)) {
+        throw new Error('timeEvents는 배열이어야 합니다.');
+    }
+
+    const eventIds = new Set<string>();
+
+    for (const [index, event] of value.timeEvents.entries()) {
+            const label = `timeEvents[${index}]`;
+
+            if (!isRecord(event)) {
+                throw new Error(`${label}는 객체여야 합니다.`);
+            }
+
+            if (!isNonEmptyString(event.id)) {
+                throw new Error(`${label}.id가 올바르지 않습니다.`);
+            }
+
+            if (eventIds.has(event.id)) {
+                throw new Error(`${label}.id가 중복되었습니다.`);
+            }
+
+            eventIds.add(event.id);
+
+            if (
+                typeof event.atMinute !== 'number' ||
+                !Number.isFinite(event.atMinute) ||
+                event.atMinute <= 0
+            ) {
+                throw new Error(`${label}.atMinute가 올바르지 않습니다.`);
+            }
+
+            if (!Array.isArray(event.when)) {
+                throw new Error(`${label}.when은 배열이어야 합니다.`);
+            }
+
+            for (const [conditionIndex, condition] of event.when.entries()) {
+                validateCondition(
+                    condition,
+                    `${label}.when[${conditionIndex}]`,
+                    value.initialState,
+                );
+            }
+
+            if (!Array.isArray(event.effects) || event.effects.length === 0) {
+                throw new Error(`${label}.effects는 비어 있지 않은 배열이어야 합니다.`);
+            }
+
+            for (const [effectIndex, effect] of event.effects.entries()) {
+                if (
+                    isRecord(effect) &&
+                    effect.path === 'knowledge.knownFacts'
+                ) {
+                    throw new Error(
+                        `${label}.effects는 지식 정보를 직접 변경할 수 없습니다.`,
+                    );
+                }
+
+                validateEffect(
+                    effect,
+                    `${label}.effects[${effectIndex}]`,
+                    value.initialState,
+                );
+            }
+        }
+    }
+
+
 
     if (!Array.isArray(value.endings) || value.endings.length === 0) {
         throw new Error('endings는 비어 있지 않은 배열이어야 합니다.');
@@ -359,63 +495,13 @@ export function validateScenarioV2(value: unknown): asserts value is ScenarioV2 
                 }
 
                 
-                for (const [outcomeEffectIndex, outcomeEffect] of outcome.effects.entries()) {
-                    const effectLabel = `${outcomeLabel}.effects[${outcomeEffectIndex}]`;
-
-                    if (!isRecord(outcomeEffect)) {
-                        throw new Error(`${effectLabel}는 객체여야 합니다.`);
-                    }
-
-                    if (!isNonEmptyString(outcomeEffect.path)) {
-                        throw new Error(`${effectLabel}.path가 올바르지 않습니다.`);
-                    }
-
-                    switch (outcomeEffect.type) {
-                        case 'SET': {
-                            validateStateValueType(
-                                value.initialState,
-                                outcomeEffect.path,
-                                outcomeEffect.value,
-                            );
-                            break;
-                        }
-
-                        case 'ADD': {
-                            if (
-                                typeof outcomeEffect.value !== 'number' ||
-                                !Number.isFinite(outcomeEffect.value)
-                            ) {
-                                throw new Error(`${effectLabel}.value는 유한한 숫자여야 합니다.`);
-                            }
-
-                            const currentValue = getStateValue(
-                                value.initialState,
-                                outcomeEffect.path,
-                            );
-
-                            if (typeof currentValue !== 'number') {
-                                throw new Error(`${effectLabel}.ADD 대상은 숫자여야 합니다.`);
-                            }
-
-                            break;
-                        }
-
-                        case 'APPEND_UNIQUE':
-                        case 'REMOVE': {
-                            if (outcomeEffect.path !== 'knowledge.knownFacts') {
-                                throw new Error(`${effectLabel}.path가 올바르지 않습니다.`);
-                            }
-
-                            if (!isNonEmptyString(outcomeEffect.value)) {
-                                throw new Error(`${effectLabel}.value는 문자열이어야 합니다.`);
-                            }
-
-                            break;
-                        }
-
-                        default:
-                            throw new Error(`${effectLabel}.type이 올바르지 않습니다.`);
-                    }
+                
+                for (const [effectIndex, effect] of outcome.effects.entries()) {
+                    validateEffect(
+                        effect,
+                        `${outcomeLabel}.effects[${effectIndex}]`,
+                        value.initialState,
+                    );
                 }
 
 

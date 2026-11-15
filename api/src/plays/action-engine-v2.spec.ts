@@ -610,3 +610,167 @@ test('여러 효과를 순서대로 적용하고 원본은 유지한다', () => 
 
     expect(original.world.fireFloor).toBe(10);
 });
+
+
+
+test('시간 이벤트가 행동 결과 선택에 반영된다', () => {
+    const testScenario = structuredClone(scenario);
+
+    testScenario.timeEvents = [
+        {
+            id: 'SMOKE_SPREAD',
+            atMinute: 3,
+            when: [],
+            effects: [
+                {
+                    type: 'SET',
+                    path: 'world.insideSmoke',
+                    value: true,
+                },
+            ],
+        },
+    ];
+
+    const scene = testScenario.scenes.find(
+        (scene) => scene.id === testScenario.initialSceneId
+    );
+
+    if (!scene) {
+        throw new Error('시작 장면이 없습니다.');
+    }
+
+    scene.actions.push({
+        id: 'CHECK_DOOR',
+        text: '현관 상황을 확인한다.',
+        when: [
+            {
+                path: 'world.insideSmoke',
+                op: 'EQ',
+                value: false,
+            },
+        ],
+        durationMinutes: 5,
+        outcomes: [
+            {
+                when: [
+                    {
+                        path: 'world.insideSmoke',
+                        op: 'EQ',
+                        value: false,
+                    },
+                ],
+                resultText: '현관으로 이동했습니다.',
+                effects: [
+                    {
+                        type: 'SET',
+                        path: 'player.location',
+                        value: 'HALLWAY',
+                    },
+                ],
+                transition: { type: 'STAY' },
+            },
+            {
+                when: [
+                    {
+                        path: 'world.insideSmoke',
+                        op: 'EQ',
+                        value: true,
+                    },
+                ],
+                resultText: '연기가 퍼져 방으로 물러났습니다.',
+                effects: [
+                    {
+                        type: 'SET',
+                        path: 'player.location',
+                        value: 'HOME_ROOM',
+                    },
+                ],
+                transition: { type: 'STAY' },
+            },
+        ],
+    });
+
+    const original = createInitialPlayDataV2(testScenario, 4, 0);
+    const result = executeActionV2(original, testScenario, 'CHECK_DOOR');
+
+    expect(result.storyTimeMinutes).toBe(5);
+    expect(result.scenarioState.world.insideSmoke).toBe(true);
+    expect(result.scenarioState.player.location).toBe('HOME_ROOM');
+
+    expect(original.storyTimeMinutes).toBe(0);
+    expect(original.scenarioState.world.insideSmoke).toBe(false);
+    expect(original.scenarioState.player.location).toBe('HOME_LIVING');
+
+    expect(result.scenarioState.knowledge.knownFacts)
+        .toEqual(original.scenarioState.knowledge.knownFacts);
+});
+
+test('연속 행동에서 시간이 누적되고 과거 이벤트는 재실행되지 않는다', () => {
+    const testScenario = structuredClone(scenario);
+
+    testScenario.timeEvents = [
+        {
+            id: 'FIRST',
+            atMinute: 3,
+            when: [],
+            effects: [
+                {
+                    type: 'ADD',
+                    path: 'world.fireFloor',
+                    value: 1,
+                },
+            ],
+        },
+        {
+            id: 'SECOND',
+            atMinute: 8,
+            when: [],
+            effects: [
+                {
+                    type: 'ADD',
+                    path: 'world.fireFloor',
+                    value: 1,
+                },
+            ],
+        },
+    ];
+
+    const scene = testScenario.scenes.find(
+        (scene) => scene.id === testScenario.initialSceneId
+    );
+
+    if (!scene) {
+        throw new Error('시작 장면이 없습니다.');
+    }
+
+    scene.actions.push({
+        id: 'WAIT',
+        text: '5분 기다린다.',
+        when: [],
+        durationMinutes: 5,
+        outcomes: [
+            {
+                when: [],
+                resultText: '시간이 경과했습니다.',
+                effects: [],
+                transition: { type: 'STAY' },
+            },
+        ],
+    });
+
+    const original = createInitialPlayDataV2(testScenario, 4, 0);
+
+    const first = executeActionV2(original, testScenario, 'WAIT');
+    const second = executeActionV2(first, testScenario, 'WAIT');
+
+    expect(first.storyTimeMinutes).toBe(5);
+    expect(first.scenarioState.world.fireFloor).toBe(11);
+    expect(first.version).toBe(1);
+
+    expect(second.storyTimeMinutes).toBe(10);
+    expect(second.scenarioState.world.fireFloor).toBe(12);
+    expect(second.version).toBe(2);
+
+    expect(original.storyTimeMinutes).toBe(0);
+    expect(original.scenarioState.world.fireFloor).toBe(10);
+});
