@@ -213,59 +213,126 @@ export class RedisService
     expectedVersion: number,
     nextData: PlayDataV2,
   ): Promise<boolean> {
-    if (
-      !Number.isSafeInteger(expectedVersion) ||
-      expectedVersion < 0 ||
-      nextData.version !== expectedVersion + 1
-    ) {
-      throw new Error('V2 플레이 버전이 올바르지 않습니다.');
-    }
+      if (
+          !Number.isSafeInteger(expectedVersion) ||
+          expectedVersion < 0 ||
+          nextData.version !== expectedVersion + 1
+      ) {
+          throw new Error(
+              'V2 플레이 버전이 올바르지 않습니다.',
+          );
+      }
 
-    const key = `play:v2:${playId}`;
+      const playKey = `play:v2:${playId}`;
+      const pendingKey = `pending:v2:play-result:${playId}`;
 
-    const script = `
-      local value = redis.call('GET', KEYS[1])
+      const script = `
+          local value = redis.call('GET', KEYS[1])
 
-      if not value then
-        return 0
-      end
+          if not value then
+              return 0
+          end
 
-      local current = cjson.decode(value)
+          local current = cjson.decode(value)
 
-      if current.state ~= 'PLAYING' then
-        return 0
-      end
+          if current.state ~= 'PLAYING' then
+              return 0
+          end
 
-      if current.version ~= tonumber(ARGV[1]) then
-        return 0
-      end
+          if current.version ~= tonumber(ARGV[1]) then
+              return 0
+          end
 
-      local nextData = cjson.decode(ARGV[2])
+          local nextData = cjson.decode(ARGV[2])
 
-      if nextData.version ~= current.version + 1 then
-        return redis.error_reply('Invalid next version')
-      end
+          if nextData.version ~= current.version + 1 then
+              return redis.error_reply('Invalid next version')
+          end
 
-      if current.userId ~= nextData.userId or
-        current.scenarioId ~= nextData.scenarioId or
-        current.scenarioVersion ~= nextData.scenarioVersion then
-        return redis.error_reply('Play identity mismatch')
-      end
+          if current.userId ~= nextData.userId or
+            current.scenarioId ~= nextData.scenarioId or
+            current.scenarioVersion ~= nextData.scenarioVersion then
+              return redis.error_reply('Play identity mismatch')
+          end
 
-      redis.call('SET', KEYS[1], ARGV[2], 'EX', 3600)
+          local nextState = nextData.state
 
-      return 1
-    `;
+          if nextState ~= 'PLAYING' and
+            nextState ~= 'CLEARED' and
+            nextState ~= 'FAILED' and
+            nextState ~= 'GIVEN_UP' then
+              return redis.error_reply('Invalid play state')
+          end
 
-    const result = await this.client.eval(script, {
-      keys: [key],
-      arguments: [
-        String(expectedVersion),
-        JSON.stringify(nextData),
-      ],
-    });
+          local isFinished =
+              nextState == 'CLEARED' or
+              nextState == 'FAILED'
 
-    return result === 1;
+          if isFinished then
+              if type(nextData.endingId) ~= 'string' or
+                nextData.endingId == '' then
+                  return redis.error_reply('Missing ending ID')
+              end
+
+              if redis.call('EXISTS', KEYS[2]) ~= 0 then
+                  return redis.error_reply('Pending result already exists')
+              end
+
+              redis.call('SET', KEYS[2], ARGV[2])
+          end
+
+          redis.call('SET', KEYS[1], ARGV[2], 'EX', 3600)
+
+          return 1
+      `;
+
+      const result = await this.client.eval(script, {
+          keys: [playKey, pendingKey],
+          arguments: [
+              String(expectedVersion),
+              JSON.stringify(nextData),
+          ],
+      });
+
+      return result === 1;
+  }
+
+  async getPendingPlayResultV2(
+      playId: string,
+  ): Promise<PlayDataV2 | null> {
+      const key = `pending:v2:play-result:${playId}`;
+
+      const value = await this.client.get(key);
+
+      if (value === null) {
+          return null;
+      }
+
+      return JSON.parse(value) as PlayDataV2;
+  }
+
+  async deletePendingPlayResultV2(
+      playId: string,
+  ): Promise<void> {
+      const key = `pending:v2:play-result:${playId}`;
+
+      await this.client.del(key);
+  }
+
+  async scanPendingPlayIdsV2(): Promise<string[]> {
+      const prefix = 'pending:v2:play-result:';
+      const playIds = new Set<string>();
+
+      for await (const keys of this.client.scanIterator({
+          MATCH: `${prefix}*`,
+          COUNT: 100,
+      })) {
+          for (const key of keys) {
+              playIds.add(key.slice(prefix.length));
+          }
+      }
+
+      return [...playIds];
   }
 
 }

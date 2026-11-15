@@ -34,6 +34,7 @@ afterAll(async () => {
           `play:${id}`,
           `play:v2:${id}`,
           `pending:play-result:${id}`,
+          `pending:v2:play-result:${id}`,
         ]);
       }
     }
@@ -474,3 +475,170 @@ test('GIVEN_UP 상태에서는 pending 결과를 생성하지 않는다', async 
       expect(await service.getPlayV2(playId))
         .toEqual(resultA ? nextA : nextB);
     });
+
+
+    test('V2 종료 시 pending 결과가 함께 저장된다', async () => {
+      const scenario = await loadScenarioV2('apartment_fire_01');
+
+      for (const state of ['CLEARED', 'FAILED'] as const) {
+          const playId = `test-${randomUUID()}`;
+          playIds.push(playId);
+
+          const initial = createInitialPlayDataV2(
+              scenario, 4, 0,
+          );
+
+          const finished = {
+              ...initial,
+              state,
+              version: 1,
+              endingId: `TEST_${state}`,
+              storyTimeMinutes: 5,
+          };
+
+          await service.savePlayV2(playId, initial);
+
+          const updated = await service.updatePlayV2IfVersion(
+              playId, 0, finished,
+          );
+
+          expect(updated).toBe(true);
+          expect(await service.getPlayV2(playId)).toEqual(finished);
+
+          const pendingKey =
+              `pending:v2:play-result:${playId}`;
+
+          const pending = await cleanupClient.get(pendingKey);
+
+          expect(pending).not.toBeNull();
+          expect(JSON.parse(pending!)).toEqual(finished);
+
+          // pending은 일반 플레이 TTL과 독립적으로 보관
+          expect(await cleanupClient.ttl(pendingKey)).toBe(-1);
+      }
+  });
+
+  test('V2 CAS 실패 시 pending을 생성하지 않는다', async () => {
+      const playId = `test-${randomUUID()}`;
+      playIds.push(playId);
+
+      const scenario = await loadScenarioV2('apartment_fire_01');
+      const initial = createInitialPlayDataV2(scenario, 4, 0);
+
+      const finished = {
+          ...initial,
+          state: 'CLEARED' as const,
+          endingId: 'TEST_CLEAR',
+          version: 2,
+      };
+
+      await service.savePlayV2(playId, initial);
+
+      const updated = await service.updatePlayV2IfVersion(
+          playId, 1, finished,
+      );
+
+      expect(updated).toBe(false);
+      expect(await service.getPlayV2(playId)).toEqual(initial);
+
+      expect(
+          await cleanupClient.get(
+              `pending:v2:play-result:${playId}`,
+          ),
+      ).toBeNull();
+  });
+
+  test('V2 동시 종료 요청 중 하나만 pending을 생성한다', async () => {
+      const playId = `test-${randomUUID()}`;
+      playIds.push(playId);
+
+      const scenario = await loadScenarioV2('apartment_fire_01');
+      const initial = createInitialPlayDataV2(scenario, 4, 0);
+
+      const resultA = {
+          ...initial,
+          state: 'CLEARED' as const,
+          endingId: 'ENDING_A',
+          version: 1,
+      };
+
+      const resultB = {
+          ...initial,
+          state: 'FAILED' as const,
+          endingId: 'ENDING_B',
+          version: 1,
+      };
+
+      await service.savePlayV2(playId, initial);
+
+      const [savedA, savedB] = await Promise.all([
+          service.updatePlayV2IfVersion(playId, 0, resultA),
+          service.updatePlayV2IfVersion(playId, 0, resultB),
+      ]);
+
+      expect(savedA).not.toBe(savedB);
+
+      const expected = savedA ? resultA : resultB;
+
+      expect(await service.getPlayV2(playId)).toEqual(expected);
+
+      const pending = await cleanupClient.get(
+          `pending:v2:play-result:${playId}`,
+      );
+
+      expect(JSON.parse(pending!)).toEqual(expected);
+  });
+
+  test('V2 진행 중 행동은 pending을 생성하지 않는다', async () => {
+      const playId = `test-${randomUUID()}`;
+      playIds.push(playId);
+
+      const scenario = await loadScenarioV2('apartment_fire_01');
+      const initial = createInitialPlayDataV2(scenario, 4, 0);
+
+      const next = executeActionV2(
+          initial, scenario, 'E01-A',
+      ).playData;
+
+      await service.savePlayV2(playId, initial);
+
+      expect(
+          await service.updatePlayV2IfVersion(playId, 0, next),
+      ).toBe(true);
+
+      expect(next.state).toBe('PLAYING');
+
+      expect(
+          await cleanupClient.get(
+              `pending:v2:play-result:${playId}`,
+          ),
+      ).toBeNull();
+  });
+
+  test('V2 GIVEN_UP 상태는 pending을 생성하지 않는다', async () => {
+      const playId = `test-${randomUUID()}`;
+      playIds.push(playId);
+
+      const scenario = await loadScenarioV2('apartment_fire_01');
+      const initial = createInitialPlayDataV2(scenario, 4, 0);
+
+      const givenUp = {
+          ...initial,
+          state: 'GIVEN_UP' as const,
+          version: 1,
+      };
+
+      await service.savePlayV2(playId, initial);
+
+      expect(
+          await service.updatePlayV2IfVersion(playId, 0, givenUp),
+      ).toBe(true);
+
+      expect(await service.getPlayV2(playId)).toEqual(givenUp);
+
+      expect(
+          await cleanupClient.get(
+              `pending:v2:play-result:${playId}`,
+          ),
+      ).toBeNull();
+  });

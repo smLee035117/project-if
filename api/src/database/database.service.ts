@@ -5,6 +5,8 @@ import type { ResultSetHeader, RowDataPacket  } from 'mysql2';
 
 import type { PlayData } from '../plays/types/play.js';
 
+import type { PlayDataV2 } from '../plays/types/play-v2.js';
+
 interface GuestSessionRow extends RowDataPacket {
   user_no: number;
 }
@@ -14,6 +16,17 @@ interface PlayResultRow extends RowDataPacket {
   scenario_id: string;
   score: number;
   result_state: string;
+}
+
+
+interface PlayResultV2Row extends RowDataPacket {
+    user_no: number;
+    scenario_id: string;
+    scenario_version: string;
+    result_state: string;
+    ending_id: string;
+    story_time_minutes: number;
+    play_version: number;
 }
 
 
@@ -166,6 +179,121 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy  {
             }
         }
 
+    }
+
+
+    async savePlayResultV2(
+        playId: string,
+        playData: PlayDataV2,
+    ): Promise<void> {
+        if (
+            playData.state !== 'CLEARED' &&
+            playData.state !== 'FAILED'
+        ) {
+            throw new Error(
+                '종료되지 않은 V2 플레이는 저장할 수 없습니다.',
+            );
+        }
+
+        if (
+            typeof playData.endingId !== 'string' ||
+            playData.endingId.trim().length === 0
+        ) {
+            throw new Error('V2 엔딩 ID가 올바르지 않습니다.');
+        }
+
+        if (
+            !Number.isFinite(playData.storyTimeMinutes) ||
+            playData.storyTimeMinutes < 0
+        ) {
+            throw new Error('V2 진행 시간이 올바르지 않습니다.');
+        }
+
+        if (
+            !Number.isSafeInteger(playData.version) ||
+            playData.version <= 0 ||
+            playData.version > 4294967295
+        ) {
+            throw new Error('V2 플레이 버전이 올바르지 않습니다.');
+        }
+
+        const sql = `
+            INSERT INTO user_play_log_v2 (
+                play_id,
+                user_no,
+                scenario_id,
+                scenario_version,
+                result_state,
+                ending_id,
+                story_time_minutes,
+                play_version,
+                finished_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, UTC_TIMESTAMP(6))
+        `;
+
+        try {
+            await this.pool.execute(sql, [
+                playId,
+                playData.userId,
+                playData.scenarioId,
+                playData.scenarioVersion,
+                playData.state,
+                playData.endingId,
+                playData.storyTimeMinutes,
+                playData.version,
+            ]);
+        } catch (error: unknown) {
+            const isDuplicate =
+                error instanceof Error &&
+                'code' in error &&
+                error.code === 'ER_DUP_ENTRY';
+
+            if (!isDuplicate) {
+                throw error;
+            }
+
+            const [rows] =
+                await this.pool.execute<PlayResultV2Row[]>(
+                    `SELECT
+                        user_no,
+                        scenario_id,
+                        scenario_version,
+                        result_state,
+                        ending_id,
+                        story_time_minutes,
+                        play_version
+                    FROM user_play_log_v2
+                    WHERE play_id = ?`,
+                    [playId],
+                );
+
+            const existing = rows[0];
+
+            if (!existing) {
+                throw new Error(
+                    '중복된 V2 플레이 결과를 찾을 수 없습니다.',
+                );
+            }
+
+            const isSameResult =
+                existing.user_no === playData.userId &&
+                existing.scenario_id === playData.scenarioId &&
+                existing.scenario_version === playData.scenarioVersion &&
+                existing.result_state === playData.state &&
+                existing.ending_id === playData.endingId &&
+                existing.story_time_minutes ===
+                    playData.storyTimeMinutes &&
+                existing.play_version === playData.version;
+
+            if (isSameResult) {
+                return;
+            }
+
+            throw new Error(
+                '기존 V2 플레이 결과와 저장 요청이 일치하지 않습니다.',
+            );
+        }
     }
 
 }

@@ -1,37 +1,80 @@
-
 import {
-  Injectable,
-  type OnApplicationBootstrap,
+    Injectable,
+    type OnApplicationBootstrap,
+    type OnApplicationShutdown,
 } from '@nestjs/common';
 
 import { PlaysService } from './plays.service.js';
 
-
+const RECOVERY_INTERVAL_MS = 60_000;
 
 @Injectable()
 export class PlayRecoveryBootstrapService
-  implements OnApplicationBootstrap {
+    implements OnApplicationBootstrap, OnApplicationShutdown {
 
-  constructor(
-    private readonly playsService: PlaysService,
-  ) {}
+    private recoveryTimer: ReturnType<typeof setInterval> | null = null;
+    private recoveryInProgress = false;
 
-  async onApplicationBootstrap(): Promise<void> {
+    constructor(
+        private readonly playsService: PlaysService,
+    ) {}
 
-    // 1. 테스트 환경이라면 자동 복구 실행하지 않기
-    if(process.env.NODE_ENV === 'test') {
-        return
+    async onApplicationBootstrap(): Promise<void> {
+        if (process.env.NODE_ENV === 'test') {
+            return;
+        }
+
+        // 서버 시작 시 즉시 한 번 복구
+        await this.recoverOnce();
+
+        // 중복 타이머 생성 방지
+        if (this.recoveryTimer !== null) {
+            return;
+        }
+
+        // 이후 60초 간격으로 재시도
+        this.recoveryTimer = setInterval(() => {
+            void this.recoverOnce();
+        }, RECOVERY_INTERVAL_MS);
+
+        this.recoveryTimer.unref();
     }
-    
-    try{
-        // 2. try 블록에서 복구 메서드 실행
-        await this.playsService.recoverPendingPlayResults();
 
-    } catch(error: unknown) {
-        // 3. catch 블록에서 복구 실행 오류 기록
-        console.error('서버 시작 시 pending 복구 실패:', error);
+    onApplicationShutdown(): void {
+        if (this.recoveryTimer !== null) {
+            clearInterval(this.recoveryTimer);
+            this.recoveryTimer = null;
+        }
     }
 
-    
-  }
+    private async recoverOnce(): Promise<void> {
+        // 동일 인스턴스에서 복구 작업 중복 실행 방지
+        if (this.recoveryInProgress) {
+            return;
+        }
+
+        this.recoveryInProgress = true;
+
+        try {
+            try {
+                await this.playsService.recoverPendingPlayResults();
+            } catch (error: unknown) {
+                console.error(
+                    'V1 pending 복구 실행 실패:',
+                    error,
+                );
+            }
+
+            try {
+                await this.playsService.recoverPendingPlayResultsV2();
+            } catch (error: unknown) {
+                console.error(
+                    'V2 pending 복구 실행 실패:',
+                    error,
+                );
+            }
+        } finally {
+            this.recoveryInProgress = false;
+        }
+    }
 }

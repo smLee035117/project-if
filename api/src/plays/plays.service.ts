@@ -472,11 +472,68 @@ export class PlaysService {
       );
     }
 
+    if (
+        result.playData.state === 'CLEARED' ||
+        result.playData.state === 'FAILED'
+    ) {
+        await this.databaseService.savePlayResultV2(
+            playId,
+            result.playData,
+        );
+
+        await this.redisService.deletePendingPlayResultV2(
+            playId,
+        );
+    }
+
     return {
       resultText: result.resultText,
       view: nextView,
     };
   }
 
+
+
+  async recoverPendingPlayResultsV2(): Promise<void> {
+      const playIds =
+          await this.redisService.scanPendingPlayIdsV2();
+
+      for (const playId of playIds) {
+          try {
+              const pendingData =
+                  await this.redisService.getPendingPlayResultV2(
+                      playId,
+                  );
+
+              if (pendingData === null) {
+                  continue;
+              }
+
+              if (
+                  pendingData.state !== 'CLEARED' &&
+                  pendingData.state !== 'FAILED'
+              ) {
+                  console.error(
+                      `V2 pending 상태 오류: ${playId}`,
+                  );
+                  continue;
+              }
+
+              await this.databaseService.savePlayResultV2(
+                  playId,
+                  pendingData,
+              );
+
+              await this.redisService.deletePendingPlayResultV2(
+                  playId,
+              );
+          } catch (error: unknown) {
+              console.error(
+                  `V2 pending 복구 실패: ${playId}`,
+                  error,
+              );
+          }
+      }
+  }
 
 }

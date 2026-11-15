@@ -21,6 +21,7 @@ test('개발 환경에서 복구 메서드를 한 번 실행한다', async () =>
   // 2. recoverPendingPlayResults Mock 생성
     const playsMock = {
         recoverPendingPlayResults: vi.fn().mockResolvedValue(undefined),
+        recoverPendingPlayResultsV2: vi.fn().mockResolvedValue(undefined),
     };
 
   // 3. PlayRecoveryBootstrapService 인스턴스 생성
@@ -33,7 +34,7 @@ test('개발 환경에서 복구 메서드를 한 번 실행한다', async () =>
 
   // 5. 복구 메서드가 정확히 한 번 호출됐는지 검증
   expect(playsMock.recoverPendingPlayResults).toHaveBeenCalledOnce();
-
+  expect(playsMock.recoverPendingPlayResultsV2).toHaveBeenCalledOnce();
 });
 
 test('테스트 환경에서 자동 복구를 실행하지 않는다', async () => {
@@ -42,6 +43,7 @@ test('테스트 환경에서 자동 복구를 실행하지 않는다', async () 
   // 2. recoverPendingPlayResults Mock 생성
     const playsMock = {
         recoverPendingPlayResults: vi.fn().mockResolvedValue(undefined),
+        recoverPendingPlayResultsV2: vi.fn().mockResolvedValue(undefined),
     };
 
   // 3. PlayRecoveryBootstrapService 인스턴스 생성
@@ -54,6 +56,7 @@ test('테스트 환경에서 자동 복구를 실행하지 않는다', async () 
 
   // 5. 복구 메서드가 호출되지 않았는지 검증
   expect(playsMock.recoverPendingPlayResults).not.toHaveBeenCalled();
+  expect(playsMock.recoverPendingPlayResultsV2).not.toHaveBeenCalled();
 
 });
 
@@ -66,6 +69,7 @@ test('복구 실패 시에도 서버 초기화를 중단하지 않는다', async
         recoverPendingPlayResults: vi.fn().mockRejectedValue(
             new Error('Redis SCAN 실패'),
         ),
+        recoverPendingPlayResultsV2: vi.fn().mockRejectedValue( new Error('Redis SCAN 실패'),),
     };
 
   // 3. PlayRecoveryBootstrapService 인스턴스 생성
@@ -81,6 +85,7 @@ test('복구 실패 시에도 서버 초기화를 중단하지 않는다', async
 
   // 5. 예외 없이 완료됐는지 검증
     expect(playsMock.recoverPendingPlayResults).toHaveBeenCalledOnce();
+    expect(playsMock.recoverPendingPlayResultsV2).toHaveBeenCalledOnce();
 
 });
 
@@ -93,6 +98,7 @@ test('NestJS 모듈 초기화 시 자동 복구를 한 번 실행한다', async 
     // 2. PlaysService Mock 생성
     const playsMock = {
         recoverPendingPlayResults: vi.fn().mockResolvedValue(undefined),
+        recoverPendingPlayResultsV2: vi.fn().mockResolvedValue(undefined),
     };
 
     // 3. NestJS 테스트 모듈 구성
@@ -114,10 +120,68 @@ test('NestJS 모듈 초기화 시 자동 복구를 한 번 실행한다', async 
 
         // 5. 복구 메서드가 정확히 한 번 호출됐는지 검증
         expect(playsMock.recoverPendingPlayResults).toHaveBeenCalledOnce();
+        expect(playsMock.recoverPendingPlayResultsV2).toHaveBeenCalledOnce();
 
 
     } finally {
         // 6. 테스트 모듈 종료
         await moduleRef.close();
+    }
+});
+
+
+test('서버 실행 중 60초마다 V1과 V2 복구를 재시도한다', async () => {
+    vi.stubEnv('NODE_ENV', 'development');
+    vi.useFakeTimers();
+
+    const playsMock = {
+        recoverPendingPlayResults:
+            vi.fn().mockResolvedValue(undefined),
+
+        recoverPendingPlayResultsV2:
+            vi.fn().mockResolvedValue(undefined),
+    };
+
+    const bootstrapService =
+        new PlayRecoveryBootstrapService(
+            playsMock as unknown as PlaysService,
+        );
+
+    try {
+        // 서버 시작 시 최초 실행
+        await bootstrapService.onApplicationBootstrap();
+
+        expect(
+            playsMock.recoverPendingPlayResults,
+        ).toHaveBeenCalledOnce();
+
+        expect(
+            playsMock.recoverPendingPlayResultsV2,
+        ).toHaveBeenCalledOnce();
+
+        // 60초 경과
+        await vi.advanceTimersByTimeAsync(60_000);
+
+        expect(
+            playsMock.recoverPendingPlayResults,
+        ).toHaveBeenCalledTimes(2);
+
+        expect(
+            playsMock.recoverPendingPlayResultsV2,
+        ).toHaveBeenCalledTimes(2);
+
+        // 다시 60초 경과
+        await vi.advanceTimersByTimeAsync(60_000);
+
+        expect(
+            playsMock.recoverPendingPlayResults,
+        ).toHaveBeenCalledTimes(3);
+
+        expect(
+            playsMock.recoverPendingPlayResultsV2,
+        ).toHaveBeenCalledTimes(3);
+    } finally {
+        bootstrapService.onApplicationShutdown();
+        vi.useRealTimers();
     }
 });
