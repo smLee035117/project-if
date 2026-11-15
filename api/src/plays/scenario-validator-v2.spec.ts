@@ -410,4 +410,28 @@ describe('validateScenarioV2', () => {
     });
 
 
+    it('장면 ID가 중복되면 거부한다', () => {
+        const scenario = loadTestScenario() as ScenarioV2;
+
+        const duplicateScene = structuredClone(scenario.scenes[0]!);
+        scenario.scenes.push(duplicateScene);
+
+        expect(() => validateScenarioV2(scenario))
+            .toThrow('scenes[1].id가 중복되었습니다.');
+    });
+
+    it('동일 장면에서 행동 ID가 중복되면 거부한다', () => {
+        const scenario = loadTestScenario() as ScenarioV2;
+
+        const duplicateAction = structuredClone(
+            scenario.scenes[0]!.actions[0]!,
+        );
+
+        scenario.scenes[0]!.actions.push(duplicateAction);
+
+        expect(() => validateScenarioV2(scenario))
+            .toThrow('scenes[0].actions[1].id가 중복되었습니다.');
+    });
+
+
 });

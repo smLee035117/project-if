@@ -389,6 +389,8 @@ if (value.timeEvents !== undefined) {
         throw new Error('version이 올바르지 않습니다.');
     }
 
+    const sceneIds = new Set<string>();
+
     for (const [sceneIndex, scene] of value.scenes.entries()) {
         const sceneLabel = `scenes[${sceneIndex}]`;
 
@@ -400,6 +402,12 @@ if (value.timeEvents !== undefined) {
             throw new Error(`${sceneLabel}.id가 올바르지 않습니다.`);
         }
 
+        if (sceneIds.has(scene.id)) {
+            throw new Error(`${sceneLabel}.id가 중복되었습니다.`);
+        }
+
+        sceneIds.add(scene.id);
+
         if (!isNonEmptyString(scene.description)) {
             throw new Error(`${sceneLabel}.description이 올바르지 않습니다.`);
         }
@@ -407,6 +415,8 @@ if (value.timeEvents !== undefined) {
         if (!Array.isArray(scene.actions)) {
             throw new Error(`${sceneLabel}.actions는 배열이어야 합니다.`);
         }
+
+        const actionIds = new Set<string>();
         
         for (const [actionIndex, action] of scene.actions.entries()) {
              const actionLabel = `${sceneLabel}.actions[${actionIndex}]`;
@@ -427,6 +437,12 @@ if (value.timeEvents !== undefined) {
             if (!isNonEmptyString(action.id)) {
                 throw new Error(`${actionLabel}.id가 올바르지 않습니다.`);
             }
+
+            if (actionIds.has(action.id)) {
+                throw new Error(`${actionLabel}.id가 중복되었습니다.`);
+            }
+
+            actionIds.add(action.id);
 
             if (!isNonEmptyString(action.text)) {
                 throw new Error(`${actionLabel}.text가 올바르지 않습니다.`);
