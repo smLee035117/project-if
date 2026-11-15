@@ -20,3 +20,10 @@ export interface PlayDataV2 extends PlayData {
     scenarioState: ScenarioState;
     endingId?: string;
 }
+
+
+
+export type ExecuteActionResultV2 = {
+    playData: PlayDataV2;
+    resultText: string;
+};

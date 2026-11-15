@@ -191,11 +191,15 @@ test('GOTO 실행 시 장면이 변경되고 원본은 유지된다', () => {
     });
 
     const original = createInitialPlayDataV2(testScenario, 4, 0);
-    const result = executeActionV2(original, testScenario, 'MOVE');
+    const {
+        playData: result,
+        resultText,
+    } = executeActionV2(original, testScenario, 'MOVE');
 
     expect(result.currentStageId).toBe('E02');
     expect(result.version).toBe(1);
     expect(result.storyTimeMinutes).toBe(2);
+    expect(resultText).toBe('다음 장면에 도착했습니다.');
 
     // 원본 데이터는 변경되지 않아야 함
     expect(original.currentStageId).toBe('E01');
@@ -248,8 +252,9 @@ test('END 실행 시 효과 적용 후 엔딩 조건을 판정한다', () => {
     });
 
     const original = createInitialPlayDataV2(testScenario, 4, 0);
-    const result = executeActionV2(original, testScenario, 'FINISH');
+    const { playData: result, resultText } = executeActionV2(original, testScenario, 'FINISH');
 
+    expect(resultText).toBe('신고했습니다.');
     expect(result.state).toBe('CLEARED');
     expect(result.endingId).toBe('TEST_CLEAR');
     expect(result.scenarioState.player.reported119).toBe(true);
@@ -319,8 +324,9 @@ test('FAILED 엔딩도 정상적으로 종료 처리한다', () => {
     const testScenario = createEndingTestScenario('FAILED', true);
 
     const original = createInitialPlayDataV2(testScenario, 4, 0);
-    const result = executeActionV2(original, testScenario, 'END_TEST');
+    const { playData: result, resultText } = executeActionV2(original, testScenario, 'END_TEST');
 
+    expect(resultText).toBe('행동을 완료했습니다.');
     expect(result.state).toBe('FAILED');
     expect(result.endingId).toBe('TEST_END');
     expect(result.version).toBe(1);
@@ -691,8 +697,9 @@ test('시간 이벤트가 행동 결과 선택에 반영된다', () => {
     });
 
     const original = createInitialPlayDataV2(testScenario, 4, 0);
-    const result = executeActionV2(original, testScenario, 'CHECK_DOOR');
+    const { playData: result, resultText } = executeActionV2(original, testScenario, 'CHECK_DOOR');
 
+    expect(resultText).toBe('연기가 퍼져 방으로 물러났습니다.');
     expect(result.storyTimeMinutes).toBe(5);
     expect(result.scenarioState.world.insideSmoke).toBe(true);
     expect(result.scenarioState.player.location).toBe('HOME_ROOM');
@@ -760,8 +767,24 @@ test('연속 행동에서 시간이 누적되고 과거 이벤트는 재실행�
 
     const original = createInitialPlayDataV2(testScenario, 4, 0);
 
-    const first = executeActionV2(original, testScenario, 'WAIT');
-    const second = executeActionV2(first, testScenario, 'WAIT');
+    const firstResult = executeActionV2(
+        original,
+        testScenario,
+        'WAIT',
+    );
+
+    const first = firstResult.playData;
+
+    const secondResult = executeActionV2(
+        first,
+        testScenario,
+        'WAIT',
+    );
+
+    const second = secondResult.playData;
+
+    expect(firstResult.resultText).toBe('시간이 경과했습니다.');
+    expect(secondResult.resultText).toBe('시간이 경과했습니다.');
 
     expect(first.storyTimeMinutes).toBe(5);
     expect(first.scenarioState.world.fireFloor).toBe(11);

@@ -32,6 +32,16 @@ const scenario: ScenarioV2 = {
       actions: [],
     },
   ],
+  endings: [
+    {
+      id: 'TEST_DONE',
+      state: 'CLEARED',
+      title: '테스트 종료',
+      description: '엔딩 기능 검증용입니다.',
+      requirements: [],
+    },
+  ],
+
 };
 
 
@@ -74,7 +84,10 @@ test('E01-A 행동 실행 시 상태, 시간, 버전이 갱신된다', async () 
 
 
     // 3. executeActionV2() 실행
-    const nextState = executeActionV2(playA,scenario,'E01-A');
+    const {
+        playData: nextState,
+        resultText,
+    } = executeActionV2(playA, scenario, 'E01-A');
 
 
     // 4. 실행 결과 검증
@@ -98,5 +111,7 @@ test('E01-A 행동 실행 시 상태, 시간, 버전이 갱신된다', async () 
 
     // 원본과 반환 객체가 다른지 확인
     expect(nextState).not.toBe(playA);
+
+    expect(resultText).toBe('119에 현재 상황을 신고했습니다.');
 
 });

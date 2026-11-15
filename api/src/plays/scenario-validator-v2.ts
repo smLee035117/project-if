@@ -448,14 +448,24 @@ if (value.timeEvents !== undefined) {
             }
 
             for (const [conditionIndex, condition] of action.when.entries()) {
-                const conditionLabel = `${actionLabel}.when[${conditionIndex}]`; 
-                    validateCondition (
-                        condition,
-                        conditionLabel,
-                        value.initialState,
+                const conditionLabel =
+                    `${actionLabel}.when[${conditionIndex}]`;
+
+                validateCondition(
+                    condition,
+                    conditionLabel,
+                    value.initialState,
+                );
+
+                if (
+                    isRecord(condition) &&
+                    typeof condition.path === 'string' &&
+                    condition.path.startsWith('world.')
+                ) {
+                    throw new Error(
+                        `${conditionLabel}: 비공개 world 상태를 행동 실행 조건에 사용할 수 없습니다.`,
                     );
-
-
+                }
             }
 
             //action.outcomes

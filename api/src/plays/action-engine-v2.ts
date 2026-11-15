@@ -1,5 +1,10 @@
 
-import type { ScenarioState,PlayDataV2 } from './types/play-v2.js';
+import type {
+    ScenarioState,
+    PlayDataV2,
+    ExecuteActionResultV2,
+} from './types/play-v2.js';
+
 import type { ScenarioV2, OutcomeV2, } from './types/scenario-v2.js';
 
 
@@ -30,13 +35,13 @@ export function selectOutcome(
     // 1. outcomes를 for...of로 순회
     for( const outcome of outcomes) {
     // 2. evaluateConditions()로 각 결과의 when 검사
-        
+
         if(evaluateConditions(state,outcome.when)) {
             // 3. 조건이 참이라면 matched 배열에 추가
             matched.push(outcome);
         }
 
-    
+
 
     }
 
@@ -63,7 +68,7 @@ export function executeActionV2(
     playData: PlayDataV2,
     scenario: ScenarioV2,
     actionId: string,
-): PlayDataV2 {
+): ExecuteActionResultV2  {
 
     //현재 플레이가 PLAYING 상태인지
     if(playData.state !== 'PLAYING') {
@@ -84,12 +89,12 @@ export function executeActionV2(
     const scene = scenario.scenes.find(
         (scene) => scene.id === playData.currentStageId
     );
-    
+
     if(typeof scene === 'undefined') {
         // 에러처리.
          throw new Error('시나리오에 현재 장면이 존재하지 않습니다.');
     }
-    
+
 
     // 요청한 행동이 현재 장면에 존재하는지
 
@@ -101,13 +106,13 @@ export function executeActionV2(
         // 에러처리.
          throw new Error('현재 장면에 요청한 행동이 존재하지 않습니다.');
     }
-    
+
     // 행동의 when 조건을 만족하는지
     if(!evaluateConditions(playData.scenarioState,action.when) ) {
         throw new Error('행동 조건을 만족하지 않습니다.');
     }
 
-    const object1 = advanceTimeV2(
+    const timeResult = advanceTimeV2(
         playData.scenarioState,
         playData.storyTimeMinutes,
         action.durationMinutes,
@@ -115,17 +120,17 @@ export function executeActionV2(
     )
 
 
-    const outcome = selectOutcome(object1.scenarioState,action.outcomes);
+    const outcome = selectOutcome(timeResult.scenarioState,action.outcomes);
 
     // if(outcome.transition.type !== 'STAY') {
     //      throw new Error('transition type을 만족하지 않습니다.');
     // }
 
-   
+
 
 
     const nextScenarioState = applyEffect(
-        object1.scenarioState,
+        timeResult.scenarioState,
         outcome.effects,
     );
 
@@ -149,7 +154,7 @@ export function executeActionV2(
             throw new Error('유효한 다음 장면 정보가 없습니다.');
         }
         nextStageId = nextScene.id;
-        
+
 
     } else if (outcome.transition.type === 'END') {
         //throw new Error('END는 아직 구현하지 않았습니다.');
@@ -164,7 +169,7 @@ export function executeActionV2(
             throw new Error('유효한 엔딩 정보가 없습니다.');
         }
 
-        
+
         if(!evaluateConditions(nextScenarioState, ending.requirements)) {
             throw new Error('엔딩 조건을 만족하지 못했습니다.');
         }
@@ -174,13 +179,17 @@ export function executeActionV2(
     }
 
     return {
-        ...playData,
-        currentStageId: nextStageId,
-        scenarioState: nextScenarioState,
-        storyTimeMinutes: object1.endMinute,
-        version: playData.version + 1,
-        endingId : nextEndingId,
-        state : nextPlayState
+        playData : {
+            ...playData,
+            currentStageId: nextStageId,
+            scenarioState: nextScenarioState,
+            storyTimeMinutes: timeResult.endMinute,
+            version: playData.version + 1,
+            endingId: nextEndingId,
+            state: nextPlayState,
+        } ,
+        resultText : outcome.resultText,
+
     };
 
 

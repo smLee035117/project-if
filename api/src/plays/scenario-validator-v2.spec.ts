@@ -88,12 +88,12 @@ describe('validateScenarioV2', () => {
     });
 
 
+
     it('숫자 비교 조건을 허용한다', () => {
         const data = loadTestScenario();
-
         validateScenarioV2(data);
 
-        data.scenes[0].actions[0].when = [{
+        data.scenes[0].actions[0].outcomes[0].when = [{
             path: 'world.fireFloor',
             op: 'GT',
             value: 5,
@@ -104,10 +104,9 @@ describe('validateScenarioV2', () => {
 
     it('숫자 비교에 문자열을 사용하면 거부한다', () => {
         const data = loadTestScenario();
-
         validateScenarioV2(data);
 
-        data.scenes[0].actions[0].when = [{
+        data.scenes[0].actions[0].outcomes[0].when = [{
             path: 'world.fireFloor',
             op: 'GT',
             value: '5',
@@ -115,6 +114,21 @@ describe('validateScenarioV2', () => {
 
         expect(() => validateScenarioV2(data)).toThrow();
     });
+
+    it('action.when에서 비공개 world 상태를 사용하면 거부한다', () => {
+        const data = loadTestScenario();
+        validateScenarioV2(data);
+
+        data.scenes[0].actions[0].when = [{
+            path: 'world.fireFloor',
+            op: 'GT',
+            value: 5,
+        }];
+
+        expect(() => validateScenarioV2(data))
+            .toThrow('비공개 world 상태를 행동 실행 조건에 사용할 수 없습니다.');
+    });
+
 
 
     it('정상적인 INCLUDES 조건을 허용한다', () => {
@@ -395,5 +409,5 @@ describe('validateScenarioV2', () => {
         expect(() => validateScenarioV2(scenario)).not.toThrow();
     });
 
-    
+
 });
