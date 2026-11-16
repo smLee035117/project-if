@@ -1,37 +1,59 @@
 {
   "schemaVersion": 2,
+  "schemaRevision": "2.0.0-rc2",
   "scenarioId": "apartment_fire_01",
-  "version": "1.0.0",
+  "version": "1.3.0-content.3",
   "title": "경보가 울린 밤",
-  "initialSceneId": "E01",
+  "description": "13층 세대에서 경보를 듣는다. 현관 밖과 내 집의 상태를 따로 판단해야 한다.",
+  "clock": {
+    "unit": "MINUTE",
+    "mode": "ACTION_DRIVEN",
+    "eventOrder": "AT_ACTION_END_BEFORE_OUTCOME",
+    "crossingPolicy": "APPLY_DURING_ACTION_RESOLVE_AT_END"
+  },
+  "initialSceneId": "F_LIVING",
   "initialState": {
     "world": {
-      "incidentVariant": "Y",
-      "fireFloor": 10,
-      "insideSmoke": false
+      "incidentVariant": "X",
+      "insideSmoke": false,
+      "hallSmoke": false,
+      "stairSmoke": false,
+      "clear": false,
+      "rescueReady": false,
+      "escortOffered": false
     },
     "player": {
       "location": "HOME_LIVING",
-      "reported119": false
+      "unitReported": false,
+      "stairReported": false,
+      "escortHeard": false,
+      "newsChecked": false,
+      "clearHeard": false,
+      "refugeReported": false,
+      "exposed": false,
+      "incapacitated": false
     },
     "knowledge": {
-      "knownFacts": [
-        "alarm_heard",
-        "no_visible_smoke_inside"
-      ]
+      "knownFacts": []
     }
   },
   "scenes": [
     {
-      "id": "E01",
-      "description": "거실에서 화재경보가 울린다.",
+      "id": "F_LIVING",
+      "location": "HOME_LIVING",
+      "narratives": [
+        {
+          "when": [],
+          "text": "23시 47분, 해솔마을 301동 13층 1301호. 설거지를 끝내자 경보가 울린다. 지난달 오경보 때와 같은 소리지만 이번에는 이유를 모른다. 관리방송에서 야간 순찰 직원이 각 층을 확인하고 있다는 말만 짧게 들린다. 거실에는 눈에 보이는 연기가 없다. 현관 너머는 공용 홀, 반대편 침실 옆에는 세대 전용 대피공간이 있다."
+        }
+      ],
       "actions": [
         {
-          "id": "E01-A",
-          "text": "119에 현재 상황을 신고한다.",
+          "id": "F_START_CALL",
+          "text": "119에 301동 1301호와 현재 상태를 알린다",
           "when": [
             {
-              "path": "player.reported119",
+              "path": "player.unitReported",
               "op": "EQ",
               "value": false
             }
@@ -39,13 +61,55 @@
           "durationMinutes": 1,
           "outcomes": [
             {
-              "when": [],
-              "resultText": "119에 현재 상황을 신고했습니다.",
+              "when": [
+                {
+                  "path": "world.insideSmoke",
+                  "op": "EQ",
+                  "value": true
+                }
+              ],
+              "resultText": "상황요원이 동과 호수를 다시 읽는 사이 다용도실 문틈에서 연기가 번진다. 유입을 바로 알리고 침실 쪽 통로를 확인한다.",
               "effects": [
                 {
                   "type": "SET",
-                  "path": "player.reported119",
+                  "path": "player.unitReported",
                   "value": true
+                },
+                {
+                  "type": "APPEND_UNIQUE",
+                  "path": "knowledge.knownFacts",
+                  "value": "ADDRESS_RELAYED"
+                },
+                {
+                  "type": "APPEND_UNIQUE",
+                  "path": "knowledge.knownFacts",
+                  "value": "INSIDE_SMOKE"
+                }
+              ],
+              "transition": {
+                "type": "GOTO",
+                "sceneId": "F_SMOKE"
+              }
+            },
+            {
+              "when": [
+                {
+                  "path": "world.insideSmoke",
+                  "op": "EQ",
+                  "value": false
+                }
+              ],
+              "resultText": "상황요원이 동과 호수를 다시 읽는다. 출동 중이라는 답을 듣고, 실내 상태가 달라지면 다시 알리기로 한다.",
+              "effects": [
+                {
+                  "type": "SET",
+                  "path": "player.unitReported",
+                  "value": true
+                },
+                {
+                  "type": "APPEND_UNIQUE",
+                  "path": "knowledge.knownFacts",
+                  "value": "ADDRESS_RELAYED"
                 }
               ],
               "transition": {
@@ -53,23 +117,1782 @@
               }
             }
           ]
+        },
+        {
+          "id": "F_START_NEWS",
+          "text": "관리방송을 듣고 주민방의 출처를 확인한다",
+          "when": [
+            {
+              "path": "player.newsChecked",
+              "op": "EQ",
+              "value": false
+            }
+          ],
+          "durationMinutes": 2,
+          "outcomes": [
+            {
+              "when": [
+                {
+                  "path": "world.insideSmoke",
+                  "op": "EQ",
+                  "value": true
+                }
+              ],
+              "resultText": "주민방을 열 때 다용도실 문틈에서 회색 띠가 밀려든다. 메시지를 읽는 것을 중단하고 침실 쪽 통로를 확인한다.",
+              "effects": [
+                {
+                  "type": "APPEND_UNIQUE",
+                  "path": "knowledge.knownFacts",
+                  "value": "INSIDE_SMOKE"
+                }
+              ],
+              "transition": {
+                "type": "GOTO",
+                "sceneId": "F_SMOKE"
+              }
+            },
+            {
+              "when": [
+                {
+                  "path": "world.clear",
+                  "op": "EQ",
+                  "value": false
+                },
+                {
+                  "path": "world.insideSmoke",
+                  "op": "EQ",
+                  "value": false
+                }
+              ],
+              "resultText": "스피커에서는 다른 세대 화재라는 말만 들린다. 주민방의 “옥상으로 오라”는 글에는 작성 위치도, 확인한 사람도 없다.",
+              "effects": [
+                {
+                  "type": "SET",
+                  "path": "player.newsChecked",
+                  "value": true
+                },
+                {
+                  "type": "APPEND_UNIQUE",
+                  "path": "knowledge.knownFacts",
+                  "value": "OTHER_UNIT_FIRE"
+                },
+                {
+                  "type": "APPEND_UNIQUE",
+                  "path": "knowledge.knownFacts",
+                  "value": "CHAT_UNVERIFIED"
+                }
+              ],
+              "transition": {
+                "type": "STAY"
+              }
+            },
+            {
+              "when": [
+                {
+                  "path": "world.clear",
+                  "op": "EQ",
+                  "value": true
+                },
+                {
+                  "path": "world.insideSmoke",
+                  "op": "EQ",
+                  "value": false
+                }
+              ],
+              "resultText": "복도 스피커에서 13층 실내 유입이 없는 세대는 문을 닫은 채 대기를 종료해도 된다는 현장 안내가 들린다.",
+              "effects": [
+                {
+                  "type": "SET",
+                  "path": "player.newsChecked",
+                  "value": true
+                },
+                {
+                  "type": "SET",
+                  "path": "player.clearHeard",
+                  "value": true
+                },
+                {
+                  "type": "APPEND_UNIQUE",
+                  "path": "knowledge.knownFacts",
+                  "value": "OFFICIAL_CLEAR"
+                }
+              ],
+              "transition": {
+                "type": "STAY"
+              }
+            }
+          ]
+        },
+        {
+          "id": "F_START_WAIT",
+          "text": "현관을 닫은 채 거실 상태와 안내를 살핀다",
+          "when": [],
+          "durationMinutes": 2,
+          "outcomes": [
+            {
+              "when": [
+                {
+                  "path": "world.insideSmoke",
+                  "op": "EQ",
+                  "value": true
+                }
+              ],
+              "resultText": "현관은 닫혀 있지만 다용도실 문틈에서 회색 띠가 거실 쪽으로 밀려온다. 침실 쪽 별도 대피공간으로 이어지는 통로는 아직 보인다.",
+              "effects": [
+                {
+                  "type": "APPEND_UNIQUE",
+                  "path": "knowledge.knownFacts",
+                  "value": "INSIDE_SMOKE"
+                }
+              ],
+              "transition": {
+                "type": "GOTO",
+                "sceneId": "F_SMOKE"
+              }
+            },
+            {
+              "when": [
+                {
+                  "path": "world.insideSmoke",
+                  "op": "EQ",
+                  "value": false
+                },
+                {
+                  "path": "world.clear",
+                  "op": "EQ",
+                  "value": true
+                }
+              ],
+              "resultText": "거실 공기는 여전히 맑다. 스피커로 13층의 해당 세대에 대기 종료 안내가 나온다.",
+              "effects": [
+                {
+                  "type": "SET",
+                  "path": "player.clearHeard",
+                  "value": true
+                },
+                {
+                  "type": "APPEND_UNIQUE",
+                  "path": "knowledge.knownFacts",
+                  "value": "OFFICIAL_CLEAR"
+                }
+              ],
+              "transition": {
+                "type": "GOTO",
+                "sceneId": "F_CLEAR"
+              }
+            },
+            {
+              "when": [
+                {
+                  "path": "world.insideSmoke",
+                  "op": "EQ",
+                  "value": false
+                },
+                {
+                  "path": "world.clear",
+                  "op": "EQ",
+                  "value": false
+                }
+              ],
+              "resultText": "스피커가 조용해진 사이에도 현관과 다용도실 쪽에 눈에 보이는 연기는 없다.",
+              "effects": [],
+              "transition": {
+                "type": "STAY"
+              }
+            }
+          ]
+        },
+        {
+          "id": "F_START_DOOR",
+          "text": "현관 안쪽에서 문 주변과 공용 홀 상태를 살핀다",
+          "when": [],
+          "durationMinutes": 1,
+          "outcomes": [
+            {
+              "when": [
+                {
+                  "path": "world.insideSmoke",
+                  "op": "EQ",
+                  "value": true
+                }
+              ],
+              "resultText": "다용도실 쪽에서 연기가 거실로 들어오기 시작한다. 현관으로 더 나가기 전에 몸을 돌린다.",
+              "effects": [
+                {
+                  "type": "APPEND_UNIQUE",
+                  "path": "knowledge.knownFacts",
+                  "value": "INSIDE_SMOKE"
+                }
+              ],
+              "transition": {
+                "type": "GOTO",
+                "sceneId": "F_SMOKE"
+              }
+            },
+            {
+              "when": [
+                {
+                  "path": "world.insideSmoke",
+                  "op": "EQ",
+                  "value": false
+                },
+                {
+                  "path": "world.hallSmoke",
+                  "op": "EQ",
+                  "value": false
+                }
+              ],
+              "resultText": "현관은 닫혀 있고 가까운 홀을 비추는 화면에도 연기는 보이지 않는다. 화면 가장자리의 계단 방화문 뒤와 아래층은 확인할 수 없다. 실내에서 기다릴 수도 있다.",
+              "effects": [
+                {
+                  "type": "APPEND_UNIQUE",
+                  "path": "knowledge.knownFacts",
+                  "value": "HALL_WAS_CLEAR"
+                }
+              ],
+              "transition": {
+                "type": "GOTO",
+                "sceneId": "F_ENTRY"
+              }
+            },
+            {
+              "when": [
+                {
+                  "path": "world.insideSmoke",
+                  "op": "EQ",
+                  "value": false
+                },
+                {
+                  "path": "world.hallSmoke",
+                  "op": "EQ",
+                  "value": true
+                }
+              ],
+              "resultText": "현관 바깥 홀 끝을 비추는 화면이 흐려지고 문 주변에 매캐한 냄새가 난다. 현관을 열지 않는다.",
+              "effects": [
+                {
+                  "type": "APPEND_UNIQUE",
+                  "path": "knowledge.knownFacts",
+                  "value": "HALL_SMOKE_SEEN"
+                }
+              ],
+              "transition": {
+                "type": "GOTO",
+                "sceneId": "F_WAIT"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "F_WAIT",
+      "location": "HOME_LIVING",
+      "narratives": [
+        {
+          "when": [],
+          "text": "현관은 닫혀 있다. 홀에서 들리던 발소리가 멎고 스피커 잡음만 남았다."
+        }
+      ],
+      "actions": [
+        {
+          "id": "F_HOME_CALL",
+          "text": "119에 301동 1301호와 현재 상태를 알린다",
+          "when": [
+            {
+              "path": "player.unitReported",
+              "op": "EQ",
+              "value": false
+            }
+          ],
+          "durationMinutes": 1,
+          "outcomes": [
+            {
+              "when": [
+                {
+                  "path": "world.insideSmoke",
+                  "op": "EQ",
+                  "value": true
+                }
+              ],
+              "resultText": "상황요원이 동과 호수를 다시 읽는 사이 다용도실 문틈에서 연기가 번진다. 유입을 바로 알리고 침실 쪽 통로를 확인한다.",
+              "effects": [
+                {
+                  "type": "SET",
+                  "path": "player.unitReported",
+                  "value": true
+                },
+                {
+                  "type": "APPEND_UNIQUE",
+                  "path": "knowledge.knownFacts",
+                  "value": "ADDRESS_RELAYED"
+                },
+                {
+                  "type": "APPEND_UNIQUE",
+                  "path": "knowledge.knownFacts",
+                  "value": "INSIDE_SMOKE"
+                }
+              ],
+              "transition": {
+                "type": "GOTO",
+                "sceneId": "F_SMOKE"
+              }
+            },
+            {
+              "when": [
+                {
+                  "path": "world.insideSmoke",
+                  "op": "EQ",
+                  "value": false
+                }
+              ],
+              "resultText": "상황요원이 동과 호수를 다시 읽는다. 출동 중이라는 답을 듣고, 실내 상태가 달라지면 다시 알리기로 한다.",
+              "effects": [
+                {
+                  "type": "SET",
+                  "path": "player.unitReported",
+                  "value": true
+                },
+                {
+                  "type": "APPEND_UNIQUE",
+                  "path": "knowledge.knownFacts",
+                  "value": "ADDRESS_RELAYED"
+                }
+              ],
+              "transition": {
+                "type": "STAY"
+              }
+            }
+          ]
+        },
+        {
+          "id": "F_HOME_NEWS",
+          "text": "관리방송을 듣고 주민방의 출처를 확인한다",
+          "when": [
+            {
+              "path": "player.newsChecked",
+              "op": "EQ",
+              "value": false
+            }
+          ],
+          "durationMinutes": 2,
+          "outcomes": [
+            {
+              "when": [
+                {
+                  "path": "world.insideSmoke",
+                  "op": "EQ",
+                  "value": true
+                }
+              ],
+              "resultText": "주민방을 열 때 다용도실 문틈에서 회색 띠가 밀려든다. 메시지를 읽는 것을 중단하고 침실 쪽 통로를 확인한다.",
+              "effects": [
+                {
+                  "type": "APPEND_UNIQUE",
+                  "path": "knowledge.knownFacts",
+                  "value": "INSIDE_SMOKE"
+                }
+              ],
+              "transition": {
+                "type": "GOTO",
+                "sceneId": "F_SMOKE"
+              }
+            },
+            {
+              "when": [
+                {
+                  "path": "world.clear",
+                  "op": "EQ",
+                  "value": false
+                },
+                {
+                  "path": "world.insideSmoke",
+                  "op": "EQ",
+                  "value": false
+                }
+              ],
+              "resultText": "스피커에서는 다른 세대 화재라는 말만 들린다. 주민방의 “옥상으로 오라”는 글에는 작성 위치도, 확인한 사람도 없다.",
+              "effects": [
+                {
+                  "type": "SET",
+                  "path": "player.newsChecked",
+                  "value": true
+                },
+                {
+                  "type": "APPEND_UNIQUE",
+                  "path": "knowledge.knownFacts",
+                  "value": "OTHER_UNIT_FIRE"
+                },
+                {
+                  "type": "APPEND_UNIQUE",
+                  "path": "knowledge.knownFacts",
+                  "value": "CHAT_UNVERIFIED"
+                }
+              ],
+              "transition": {
+                "type": "STAY"
+              }
+            },
+            {
+              "when": [
+                {
+                  "path": "world.clear",
+                  "op": "EQ",
+                  "value": true
+                },
+                {
+                  "path": "world.insideSmoke",
+                  "op": "EQ",
+                  "value": false
+                }
+              ],
+              "resultText": "복도 스피커에서 13층 실내 유입이 없는 세대는 문을 닫은 채 대기를 종료해도 된다는 현장 안내가 들린다.",
+              "effects": [
+                {
+                  "type": "SET",
+                  "path": "player.newsChecked",
+                  "value": true
+                },
+                {
+                  "type": "SET",
+                  "path": "player.clearHeard",
+                  "value": true
+                },
+                {
+                  "type": "APPEND_UNIQUE",
+                  "path": "knowledge.knownFacts",
+                  "value": "OFFICIAL_CLEAR"
+                }
+              ],
+              "transition": {
+                "type": "STAY"
+              }
+            }
+          ]
+        },
+        {
+          "id": "F_HOME_WAIT",
+          "text": "현관을 닫은 채 거실 상태와 안내를 살핀다",
+          "when": [],
+          "durationMinutes": 2,
+          "outcomes": [
+            {
+              "when": [
+                {
+                  "path": "world.insideSmoke",
+                  "op": "EQ",
+                  "value": true
+                }
+              ],
+              "resultText": "현관은 닫혀 있지만 다용도실 문틈에서 회색 띠가 거실 쪽으로 밀려온다. 침실 쪽 별도 대피공간으로 이어지는 통로는 아직 보인다.",
+              "effects": [
+                {
+                  "type": "APPEND_UNIQUE",
+                  "path": "knowledge.knownFacts",
+                  "value": "INSIDE_SMOKE"
+                }
+              ],
+              "transition": {
+                "type": "GOTO",
+                "sceneId": "F_SMOKE"
+              }
+            },
+            {
+              "when": [
+                {
+                  "path": "world.insideSmoke",
+                  "op": "EQ",
+                  "value": false
+                },
+                {
+                  "path": "world.clear",
+                  "op": "EQ",
+                  "value": true
+                }
+              ],
+              "resultText": "거실 공기는 여전히 맑다. 스피커로 13층의 해당 세대에 대기 종료 안내가 나온다.",
+              "effects": [
+                {
+                  "type": "SET",
+                  "path": "player.clearHeard",
+                  "value": true
+                },
+                {
+                  "type": "APPEND_UNIQUE",
+                  "path": "knowledge.knownFacts",
+                  "value": "OFFICIAL_CLEAR"
+                }
+              ],
+              "transition": {
+                "type": "GOTO",
+                "sceneId": "F_CLEAR"
+              }
+            },
+            {
+              "when": [
+                {
+                  "path": "world.insideSmoke",
+                  "op": "EQ",
+                  "value": false
+                },
+                {
+                  "path": "world.clear",
+                  "op": "EQ",
+                  "value": false
+                }
+              ],
+              "resultText": "스피커가 조용해진 사이에도 현관과 다용도실 쪽에 눈에 보이는 연기는 없다.",
+              "effects": [],
+              "transition": {
+                "type": "STAY"
+              }
+            }
+          ]
+        },
+        {
+          "id": "F_HOME_DOOR",
+          "text": "현관 안쪽에서 문 주변과 공용 홀 상태를 살핀다",
+          "when": [],
+          "durationMinutes": 1,
+          "outcomes": [
+            {
+              "when": [
+                {
+                  "path": "world.insideSmoke",
+                  "op": "EQ",
+                  "value": true
+                }
+              ],
+              "resultText": "다용도실 쪽에서 연기가 거실로 들어오기 시작한다. 현관으로 더 나가기 전에 몸을 돌린다.",
+              "effects": [
+                {
+                  "type": "APPEND_UNIQUE",
+                  "path": "knowledge.knownFacts",
+                  "value": "INSIDE_SMOKE"
+                }
+              ],
+              "transition": {
+                "type": "GOTO",
+                "sceneId": "F_SMOKE"
+              }
+            },
+            {
+              "when": [
+                {
+                  "path": "world.insideSmoke",
+                  "op": "EQ",
+                  "value": false
+                },
+                {
+                  "path": "world.hallSmoke",
+                  "op": "EQ",
+                  "value": false
+                }
+              ],
+              "resultText": "현관은 닫혀 있고 가까운 홀을 비추는 화면에도 연기는 보이지 않는다. 화면 가장자리의 계단 방화문 뒤와 아래층은 확인할 수 없다. 실내에서 기다릴 수도 있다.",
+              "effects": [
+                {
+                  "type": "APPEND_UNIQUE",
+                  "path": "knowledge.knownFacts",
+                  "value": "HALL_WAS_CLEAR"
+                }
+              ],
+              "transition": {
+                "type": "GOTO",
+                "sceneId": "F_ENTRY"
+              }
+            },
+            {
+              "when": [
+                {
+                  "path": "world.insideSmoke",
+                  "op": "EQ",
+                  "value": false
+                },
+                {
+                  "path": "world.hallSmoke",
+                  "op": "EQ",
+                  "value": true
+                }
+              ],
+              "resultText": "현관 바깥 홀 끝을 비추는 화면이 흐려지고 문 주변에 매캐한 냄새가 난다. 현관을 열지 않는다.",
+              "effects": [
+                {
+                  "type": "APPEND_UNIQUE",
+                  "path": "knowledge.knownFacts",
+                  "value": "HALL_SMOKE_SEEN"
+                }
+              ],
+              "transition": {
+                "type": "GOTO",
+                "sceneId": "F_WAIT"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "F_ENTRY",
+      "location": "HOME_ENTRY",
+      "narratives": [
+        {
+          "when": [],
+          "text": "현관 안이다. 바깥에는 짧은 홀과 방화문, 그 뒤로 지상까지 이어지는 계단이 있다. 승강기 앞은 지나치기만 한다."
+        }
+      ],
+      "actions": [
+        {
+          "id": "F_ENTER_HALL",
+          "text": "안내를 더 기다릴지 결정하기 위해 홀에서 계단 방화문 유리창을 보러 간다",
+          "when": [],
+          "durationMinutes": 2,
+          "outcomes": [
+            {
+              "when": [
+                {
+                  "path": "world.insideSmoke",
+                  "op": "EQ",
+                  "value": true
+                }
+              ],
+              "resultText": "다용도실 쪽에서 연기가 새어 나온다. 홀로 나가기 전에 거실에서 보이는 침실 쪽 통로를 확인한다.",
+              "effects": [
+                {
+                  "type": "APPEND_UNIQUE",
+                  "path": "knowledge.knownFacts",
+                  "value": "INSIDE_SMOKE"
+                }
+              ],
+              "transition": {
+                "type": "GOTO",
+                "sceneId": "F_SMOKE"
+              }
+            },
+            {
+              "when": [
+                {
+                  "path": "world.insideSmoke",
+                  "op": "EQ",
+                  "value": false
+                },
+                {
+                  "path": "world.hallSmoke",
+                  "op": "EQ",
+                  "value": true
+                }
+              ],
+              "resultText": "방화문 쪽에서 홀로 연기가 흐른다. 현관을 닫아 둔 채 안으로 물러난다.",
+              "effects": [
+                {
+                  "type": "APPEND_UNIQUE",
+                  "path": "knowledge.knownFacts",
+                  "value": "HALL_SMOKE_SEEN"
+                }
+              ],
+              "transition": {
+                "type": "GOTO",
+                "sceneId": "F_WAIT"
+              }
+            },
+            {
+              "when": [
+                {
+                  "path": "world.insideSmoke",
+                  "op": "EQ",
+                  "value": false
+                },
+                {
+                  "path": "world.hallSmoke",
+                  "op": "EQ",
+                  "value": false
+                }
+              ],
+              "resultText": "홀이 아직 맑다. 현관을 닫고 방화문 앞에 도착한다. 아래쪽 계단은 여기서 보이지 않는다.",
+              "effects": [],
+              "transition": {
+                "type": "GOTO",
+                "sceneId": "F_STAIR_DOOR"
+              }
+            }
+          ]
+        },
+        {
+          "id": "F_ENTRY_BACK",
+          "text": "문을 닫아 둔 채 거실로 돌아간다",
+          "when": [],
+          "durationMinutes": 1,
+          "outcomes": [
+            {
+              "when": [],
+              "resultText": "거실로 돌아와 스피커가 들리는 자리에 선다.",
+              "effects": [],
+              "transition": {
+                "type": "GOTO",
+                "sceneId": "F_WAIT"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "F_STAIR_DOOR",
+      "location": "HALL_13",
+      "narratives": [
+        {
+          "when": [],
+          "text": "13층 공용 홀에 있다. 한쪽은 집 현관이고 다른 쪽은 계단 방화문이다."
+        }
+      ],
+      "actions": [
+        {
+          "id": "F_CHECK_STAIR",
+          "text": "계단 방화문의 좁은 유리창으로 계단참을 확인한다",
+          "when": [],
+          "durationMinutes": 1,
+          "outcomes": [
+            {
+              "when": [
+                {
+                  "path": "world.stairSmoke",
+                  "op": "EQ",
+                  "value": true
+                }
+              ],
+              "resultText": "유리 너머 아래쪽에서 회색 연기가 치고 올라온다. 방화문을 열지 않는다.",
+              "effects": [
+                {
+                  "type": "APPEND_UNIQUE",
+                  "path": "knowledge.knownFacts",
+                  "value": "STAIR_SMOKE_SEEN"
+                }
+              ],
+              "transition": {
+                "type": "GOTO",
+                "sceneId": "F_STAIR_BLOCKED"
+              }
+            },
+            {
+              "when": [
+                {
+                  "path": "world.stairSmoke",
+                  "op": "EQ",
+                  "value": false
+                },
+                {
+                  "path": "world.escortOffered",
+                  "op": "EQ",
+                  "value": true
+                }
+              ],
+              "resultText": "12층 방향 첫 계단참이 보인다. 12층과 13층 사이에서 순찰하던 관리실 방재 직원이 방화문 너머에서 말을 건넨다. 방재실 무전으로 지상 연결 계단이 아직 통행 가능한 상태임을 확인했다고 한다. 실내가 안전하면 돌아가 대기하고, 이미 나온 주민은 자신과 함께 집결 지점까지 이동할 수 있다고 안내한다.",
+              "effects": [
+                {
+                  "type": "SET",
+                  "path": "player.escortHeard",
+                  "value": true
+                },
+                {
+                  "type": "APPEND_UNIQUE",
+                  "path": "knowledge.knownFacts",
+                  "value": "FIRST_FLIGHT_VISIBLE"
+                },
+                {
+                  "type": "APPEND_UNIQUE",
+                  "path": "knowledge.knownFacts",
+                  "value": "ESCORT_OFFER"
+                }
+              ],
+              "transition": {
+                "type": "GOTO",
+                "sceneId": "F_STAIR_VIEW"
+              }
+            },
+            {
+              "when": [
+                {
+                  "path": "world.stairSmoke",
+                  "op": "EQ",
+                  "value": false
+                },
+                {
+                  "path": "world.escortOffered",
+                  "op": "EQ",
+                  "value": false
+                }
+              ],
+              "resultText": "12층 방향 첫 계단참은 보인다. 훨씬 아래까지 확인할 시야는 없고, 계단에서 안내하는 목소리도 들리지 않는다.",
+              "effects": [
+                {
+                  "type": "APPEND_UNIQUE",
+                  "path": "knowledge.knownFacts",
+                  "value": "FIRST_FLIGHT_VISIBLE"
+                }
+              ],
+              "transition": {
+                "type": "GOTO",
+                "sceneId": "F_STAIR_VIEW"
+              }
+            }
+          ]
+        },
+        {
+          "id": "F_DOOR_BACK",
+          "text": "방화문을 닫아 둔 채 현관으로 돌아간다",
+          "when": [],
+          "durationMinutes": 1,
+          "outcomes": [
+            {
+              "when": [],
+              "resultText": "짧은 홀이 보인다. 집 안으로 들어가 현관을 닫는다.",
+              "effects": [],
+              "transition": {
+                "type": "GOTO",
+                "sceneId": "F_WAIT"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "F_STAIR_BLOCKED",
+      "location": "HALL_13",
+      "narratives": [
+        {
+          "when": [],
+          "text": "연기는 방화문 유리 너머에 있다. 돌아갈 현관이 같은 홀에 있다. 집 현관 앞까지의 동선은 아직 구분된다."
+        }
+      ],
+      "actions": [
+        {
+          "id": "F_BLOCK_BACK",
+          "text": "현관으로 돌아가 실내 상태를 다시 살핀다",
+          "when": [],
+          "durationMinutes": 1,
+          "outcomes": [
+            {
+              "when": [
+                {
+                  "path": "world.insideSmoke",
+                  "op": "EQ",
+                  "value": true
+                }
+              ],
+              "resultText": "가까운 현관으로 돌아오자 다용도실 문틈에서 연기가 보인다. 현관을 닫고 시야가 남은 침실 쪽 통로를 확인한다.",
+              "effects": [
+                {
+                  "type": "APPEND_UNIQUE",
+                  "path": "knowledge.knownFacts",
+                  "value": "INSIDE_SMOKE"
+                }
+              ],
+              "transition": {
+                "type": "GOTO",
+                "sceneId": "F_SMOKE"
+              }
+            },
+            {
+              "when": [
+                {
+                  "path": "world.insideSmoke",
+                  "op": "EQ",
+                  "value": false
+                }
+              ],
+              "resultText": "현관을 닫는다. 다용도실 쪽과 거실에는 아직 보이는 연기가 없다.",
+              "effects": [],
+              "transition": {
+                "type": "GOTO",
+                "sceneId": "F_WAIT"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "F_STAIR_VIEW",
+      "location": "HALL_13",
+      "narratives": [
+        {
+          "when": [],
+          "text": "첫 계단참은 보였지만, 아래 구간과 지상 출구는 이 자리에서 확인할 수 없다. 현관까지는 방금 건너온 짧은 홀이다. 집 안에서 연기가 들어온 것을 본 적은 아직 없다."
+        }
+      ],
+      "actions": [
+        {
+          "id": "F_GUIDED_DESCEND",
+          "text": "집결 지점까지 관리실 방재 직원의 안내를 받는다",
+          "when": [
+            {
+              "path": "player.escortHeard",
+              "op": "EQ",
+              "value": true
+            }
+          ],
+          "durationMinutes": 2,
+          "outcomes": [
+            {
+              "when": [],
+              "resultText": "관리실 방재 직원과 12층 계단참까지 내려간다. 직원은 무전으로 아래 계단의 상태를 확인한 뒤 이동을 이어가자며 잠깐 멈춘다.",
+              "effects": [],
+              "transition": {
+                "type": "GOTO",
+                "sceneId": "F_LOWER"
+              }
+            }
+          ]
+        },
+        {
+          "id": "F_DESCEND",
+          "text": "대피 방향을 확인하러 보이는 계단참까지만 내려간다",
+          "when": [
+            {
+              "path": "player.escortHeard",
+              "op": "EQ",
+              "value": false
+            }
+          ],
+          "durationMinutes": 2,
+          "outcomes": [
+            {
+              "when": [
+                {
+                  "path": "world.stairSmoke",
+                  "op": "EQ",
+                  "value": true
+                }
+              ],
+              "resultText": "아래쪽에서 갑자기 연기가 밀려든다. 막 내려선 구간에서 기침이 나기 시작해 계단의 13층 쪽 참으로 물러난다.",
+              "effects": [
+                {
+                  "type": "SET",
+                  "path": "player.exposed",
+                  "value": true
+                },
+                {
+                  "type": "APPEND_UNIQUE",
+                  "path": "knowledge.knownFacts",
+                  "value": "STAIR_SMOKE_SEEN"
+                }
+              ],
+              "transition": {
+                "type": "GOTO",
+                "sceneId": "F_UPPER"
+              }
+            },
+            {
+              "when": [
+                {
+                  "path": "world.stairSmoke",
+                  "op": "EQ",
+                  "value": false
+                }
+              ],
+              "resultText": "13층에서 한 층 내려와 12층 계단참에 도착한다. 이 층 아래는 꺾여 있어 여전히 보이지 않는다.",
+              "effects": [],
+              "transition": {
+                "type": "GOTO",
+                "sceneId": "F_LOWER"
+              }
+            }
+          ]
+        },
+        {
+          "id": "F_VIEW_BACK",
+          "text": "확인된 구간만 기억하고 현관으로 돌아간다",
+          "when": [],
+          "durationMinutes": 1,
+          "outcomes": [
+            {
+              "when": [],
+              "resultText": "공용 홀에서 집으로 돌아와 현관을 닫는다.",
+              "effects": [],
+              "transition": {
+                "type": "GOTO",
+                "sceneId": "F_WAIT"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "F_LOWER",
+      "location": "STAIR_12",
+      "narratives": [
+        {
+          "when": [],
+          "text": "12층 계단참. 방화문들은 닫혀 있다. 발화 세대가 있는 층인지, 아래층 어느 문이 열려 있는지는 아직 모른다."
+        }
+      ],
+      "actions": [
+        {
+          "id": "F_GO_OUT",
+          "text": "아래 계단의 시야와 주변 안내를 확인하며 이동한다",
+          "when": [],
+          "durationMinutes": 4,
+          "outcomes": [
+            {
+              "when": [
+                {
+                  "path": "world.stairSmoke",
+                  "op": "EQ",
+                  "value": true
+                }
+              ],
+              "resultText": "아래쪽 꺾이는 참에서 시야가 사라진다. 아래로 더 가지 않고, 보이는 상부 쪽으로 되돌아간다. 목이 따갑다.",
+              "effects": [
+                {
+                  "type": "SET",
+                  "path": "player.exposed",
+                  "value": true
+                },
+                {
+                  "type": "APPEND_UNIQUE",
+                  "path": "knowledge.knownFacts",
+                  "value": "STAIR_SMOKE_SEEN"
+                }
+              ],
+              "transition": {
+                "type": "GOTO",
+                "sceneId": "F_UPPER"
+              }
+            },
+            {
+              "when": [
+                {
+                  "path": "world.stairSmoke",
+                  "op": "EQ",
+                  "value": false
+                }
+              ],
+              "resultText": "관리실 방재 직원이 방재실과 무전으로 아래 구간을 확인하며 동행한다. 연기 없이 계단을 통과해 1층 밖 집결 지점에 도착한다.",
+              "effects": [],
+              "transition": {
+                "type": "GOTO",
+                "sceneId": "F_OUT"
+              }
+            }
+          ]
+        },
+        {
+          "id": "F_LOWER_BACK",
+          "text": "왔던 구간을 따라 위로 되돌아간다",
+          "when": [],
+          "durationMinutes": 1,
+          "outcomes": [
+            {
+              "when": [
+                {
+                  "path": "world.stairSmoke",
+                  "op": "EQ",
+                  "value": true
+                }
+              ],
+              "resultText": "올라서는 동안 아래쪽에서 연기가 밀려와 기침이 난다. 13층 계단참에서 더 이상의 이동을 멈춘다.",
+              "effects": [
+                {
+                  "type": "SET",
+                  "path": "player.exposed",
+                  "value": true
+                },
+                {
+                  "type": "APPEND_UNIQUE",
+                  "path": "knowledge.knownFacts",
+                  "value": "STAIR_SMOKE_SEEN"
+                }
+              ],
+              "transition": {
+                "type": "GOTO",
+                "sceneId": "F_UPPER"
+              }
+            },
+            {
+              "when": [
+                {
+                  "path": "world.stairSmoke",
+                  "op": "EQ",
+                  "value": false
+                }
+              ],
+              "resultText": "13층 방화문 밖 공용 홀로 돌아온다.",
+              "effects": [],
+              "transition": {
+                "type": "GOTO",
+                "sceneId": "F_STAIR_DOOR"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "F_UPPER",
+      "location": "STAIR_13",
+      "narratives": [
+        {
+          "when": [],
+          "text": "13층 안쪽 계단참이다. 홀로 나가는 방화문 바로 앞이고, 아래쪽 계단은 연기로 보이지 않는다. 기침이 멎지 않는다."
+        }
+      ],
+      "actions": [
+        {
+          "id": "F_UPPER_BACK",
+          "text": "바로 옆 방화문을 지나 홀로 나와 문을 닫는다",
+          "when": [],
+          "durationMinutes": 1,
+          "outcomes": [
+            {
+              "when": [],
+              "resultText": "홀 쪽으로 나온다. 연기가 밀려오는 방향에서 벗어났지만 목이 여전히 따갑다.",
+              "effects": [],
+              "transition": {
+                "type": "GOTO",
+                "sceneId": "F_STAIR_BLOCKED"
+              }
+            }
+          ]
+        },
+        {
+          "id": "F_UPPER_CALL",
+          "text": "13층 내부 계단참에서 119에 위치와 기침을 알린다",
+          "when": [],
+          "durationMinutes": 1,
+          "outcomes": [
+            {
+              "when": [],
+              "resultText": "위치가 접수된다. 바로 곁 방화문과 홀이 시야 안이라는 설명을 듣고 상황요원이 연기에서 벗어나 현관 쪽으로 옮긴 뒤 위치를 다시 알리라고 안내한다. 안내대로 바로 옆 홀에 나와 방화문을 닫는다.",
+              "effects": [
+                {
+                  "type": "SET",
+                  "path": "player.stairReported",
+                  "value": true
+                },
+                {
+                  "type": "APPEND_UNIQUE",
+                  "path": "knowledge.knownFacts",
+                  "value": "STAIR_LOCATION_RELAYED"
+                }
+              ],
+              "transition": {
+                "type": "GOTO",
+                "sceneId": "F_STAIR_BLOCKED"
+              }
+            }
+          ]
+        },
+        {
+          "id": "F_FORCE_DOWN",
+          "text": "아래쪽에서 들리는 외침이 대피 안내인지 확인하러 내려간다",
+          "when": [],
+          "durationMinutes": 2,
+          "outcomes": [
+            {
+              "when": [],
+              "resultText": "외침이 대피 안내인지 확인할 수 없다. 그 사이 연기로 다음 층참의 방향을 놓친다. 숨이 차고 계단에 주저앉는다.",
+              "effects": [
+                {
+                  "type": "SET",
+                  "path": "player.incapacitated",
+                  "value": true
+                }
+              ],
+              "transition": {
+                "type": "END",
+                "endingId": "EXPOSURE_FAILURE"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "F_SMOKE",
+      "location": "HOME_LIVING",
+      "narratives": [
+        {
+          "when": [],
+          "text": "다용도실 쪽에서 연기가 유입된다. 발코니 너머 외부 공기와 이 건물 전용 대피공간을 가르는 문은 침실 옆에 있다. 공용 계단의 현재 상태는 여기서 보이지 않는다."
+        }
+      ],
+      "actions": [
+        {
+          "id": "F_REFUGE",
+          "text": "보이는 침실 쪽 연결 통로로 전용 대피공간에 들어간다",
+          "when": [],
+          "durationMinutes": 1,
+          "outcomes": [
+            {
+              "when": [],
+              "resultText": "별도 대피공간으로 들어가 거실 쪽 방화문을 닫는다. 벽에는 구조대가 확인할 수 있도록 동·호수 표기가 붙어 있다.",
+              "effects": [],
+              "transition": {
+                "type": "GOTO",
+                "sceneId": "F_REFUGE_ROOM"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "F_REFUGE_ROOM",
+      "location": "REFUGE",
+      "narratives": [
+        {
+          "when": [],
+          "text": "이 세대 전용 대피공간이다. 거실과 분리된 문을 닫았다. 휴대전화는 연결된다."
+        }
+      ],
+      "actions": [
+        {
+          "id": "F_REFUGE_CALL",
+          "text": "119에 1301호 전용 대피공간에 있다고 알린다",
+          "when": [
+            {
+              "path": "player.refugeReported",
+              "op": "EQ",
+              "value": false
+            }
+          ],
+          "durationMinutes": 1,
+          "outcomes": [
+            {
+              "when": [
+                {
+                  "path": "player.unitReported",
+                  "op": "EQ",
+                  "value": true
+                }
+              ],
+              "resultText": "앞서 접수한 주소에 대피공간 위치를 덧붙인다. 구조대에 바뀐 위치가 전달된다는 답을 듣는다.",
+              "effects": [
+                {
+                  "type": "SET",
+                  "path": "player.refugeReported",
+                  "value": true
+                },
+                {
+                  "type": "APPEND_UNIQUE",
+                  "path": "knowledge.knownFacts",
+                  "value": "REFUGE_LOCATION_RELAYED"
+                }
+              ],
+              "transition": {
+                "type": "STAY"
+              }
+            },
+            {
+              "when": [
+                {
+                  "path": "player.unitReported",
+                  "op": "EQ",
+                  "value": false
+                }
+              ],
+              "resultText": "동과 호수, 대피공간 표시를 차례로 읽어 준다. 상황요원이 확보된 장소에서 구조대의 지시를 기다리라고 안내한다.",
+              "effects": [
+                {
+                  "type": "SET",
+                  "path": "player.refugeReported",
+                  "value": true
+                },
+                {
+                  "type": "APPEND_UNIQUE",
+                  "path": "knowledge.knownFacts",
+                  "value": "REFUGE_LOCATION_RELAYED"
+                }
+              ],
+              "transition": {
+                "type": "STAY"
+              }
+            }
+          ]
+        },
+        {
+          "id": "F_REFUGE_WAIT",
+          "text": "위치가 접수된 뒤 문을 닫아 둔 채 현장 연락을 기다린다",
+          "when": [
+            {
+              "path": "player.refugeReported",
+              "op": "EQ",
+              "value": true
+            }
+          ],
+          "durationMinutes": 6,
+          "outcomes": [
+            {
+              "when": [
+                {
+                  "path": "world.rescueReady",
+                  "op": "EQ",
+                  "value": true
+                }
+              ],
+              "resultText": "전화가 다시 울린다. 상황요원이 현장에 대피공간 위치를 전달했다고 알린다. 곧 바깥에서도 동과 호수를 부르는 목소리가 들린다.",
+              "effects": [
+                {
+                  "type": "APPEND_UNIQUE",
+                  "path": "knowledge.knownFacts",
+                  "value": "RESCUERS_HEARD"
+                }
+              ],
+              "transition": {
+                "type": "GOTO",
+                "sceneId": "F_CONTACT"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "F_CONTACT",
+      "location": "REFUGE",
+      "narratives": [
+        {
+          "when": [],
+          "text": "건물 외부에서 이미 현장을 통제하던 구조대원이 정확한 대피공간 위치를 확인하고 접근했다. 이동은 대원이 확보한 방법과 지시에 따른다."
+        }
+      ],
+      "actions": [
+        {
+          "id": "F_ESCORT",
+          "text": "구조대의 지시에 따라 인계된다",
+          "when": [],
+          "durationMinutes": 2,
+          "outcomes": [
+            {
+              "when": [],
+              "resultText": "대원이 대피공간에서 당신을 인계한다. 바깥에 나온 뒤 호흡 상태를 확인받는다.",
+              "effects": [],
+              "transition": {
+                "type": "GOTO",
+                "sceneId": "F_RESCUED"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "F_RESCUED",
+      "location": "OUTSIDE",
+      "narratives": [
+        {
+          "when": [],
+          "text": "건물 밖이다. 1301호에서 나왔다는 사실이 현장 인원 확인표에 기록된다."
+        }
+      ],
+      "actions": [
+        {
+          "id": "F_RESCUE_FINISH",
+          "text": "현장대원에게 이동 경로와 몸 상태를 말한다",
+          "when": [],
+          "durationMinutes": 1,
+          "outcomes": [
+            {
+              "when": [
+                {
+                  "path": "player.exposed",
+                  "op": "EQ",
+                  "value": true
+                }
+              ],
+              "resultText": "대피공간에서 기다린 과정과 계단에서 시작된 기침을 함께 전한다. 현장대원이 의료진에게 인계한다.",
+              "effects": [],
+              "transition": {
+                "type": "END",
+                "endingId": "RESCUED_WITH_EXPOSURE"
+              }
+            },
+            {
+              "when": [
+                {
+                  "path": "player.exposed",
+                  "op": "EQ",
+                  "value": false
+                }
+              ],
+              "resultText": "대피공간의 위치와 집 안에서 처음 연기를 본 곳을 설명한다. 현장대원이 상태를 확인한다.",
+              "effects": [],
+              "transition": {
+                "type": "END",
+                "endingId": "RESCUED"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "F_CLEAR",
+      "location": "HOME_LIVING",
+      "narratives": [
+        {
+          "when": [],
+          "text": "현장 확인을 거친 방송이 나왔다. 거실에 눈에 보이는 연기는 없다."
+        }
+      ],
+      "actions": [
+        {
+          "id": "F_INSIDE_END",
+          "text": "대기 종료 안내에 따라 마지막 상태를 확인한다",
+          "when": [],
+          "durationMinutes": 1,
+          "outcomes": [
+            {
+              "when": [
+                {
+                  "path": "player.exposed",
+                  "op": "EQ",
+                  "value": true
+                }
+              ],
+              "resultText": "현재 세대는 안전 확인을 받았다. 다만 앞서 계단에서 연기를 마셔 기침이 남아 있어 현장대원에게 알리고 평가를 받는다.",
+              "effects": [],
+              "transition": {
+                "type": "END",
+                "endingId": "EXPOSURE_AT_HOME"
+              }
+            },
+            {
+              "when": [
+                {
+                  "path": "player.exposed",
+                  "op": "EQ",
+                  "value": false
+                }
+              ],
+              "resultText": "방송에 따라 실내에서 대기를 마친다. 집 안에 연기가 들어오지 않은 채로 사건이 끝났다.",
+              "effects": [],
+              "transition": {
+                "type": "END",
+                "endingId": "SAFE_INSIDE"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "F_OUT",
+      "location": "OUTSIDE",
+      "narratives": [
+        {
+          "when": [],
+          "text": "1층 출구에서 떨어진 집결 지점이다. 현장 통제 인력이 나온 주민을 확인한다."
+        }
+      ],
+      "actions": [
+        {
+          "id": "F_OUT_END",
+          "text": "집결 지점에서 1301호라고 알린다",
+          "when": [],
+          "durationMinutes": 1,
+          "outcomes": [
+            {
+              "when": [],
+              "resultText": "현장 통제 인력이 호수를 받아 적는다. 이제 건물 안으로 돌아가지 않고 다음 안내를 기다린다.",
+              "effects": [],
+              "transition": {
+                "type": "END",
+                "endingId": "SAFE_OUTSIDE"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "timeline": [
+    {
+      "eventId": "F_X_ESCORT",
+      "atMinute": 4,
+      "description": "X: 경보 직전 12~13층 방화문을 순찰하던 관리실 방재 직원이 계단 구간을 확인하고 이미 나온 주민에게 동행을 제안",
+      "when": [
+        {
+          "path": "world.incidentVariant",
+          "op": "EQ",
+          "value": "X"
+        }
+      ],
+      "effects": [
+        {
+          "type": "SET",
+          "path": "world.escortOffered",
+          "value": true
+        }
+      ]
+    },
+    {
+      "eventId": "F_Y_STAIR",
+      "atMinute": 6,
+      "description": "Y: 10층 열린 계단 방화문을 통해 연기가 상부로 이동",
+      "when": [
+        {
+          "path": "world.incidentVariant",
+          "op": "EQ",
+          "value": "Y"
+        }
+      ],
+      "effects": [
+        {
+          "type": "SET",
+          "path": "world.stairSmoke",
+          "value": true
+        }
+      ]
+    },
+    {
+      "eventId": "F_Z_STAIR",
+      "atMinute": 9,
+      "description": "Z: 아래층 계단실에 연기가 축적",
+      "when": [
+        {
+          "path": "world.incidentVariant",
+          "op": "EQ",
+          "value": "Z"
+        }
+      ],
+      "effects": [
+        {
+          "type": "SET",
+          "path": "world.stairSmoke",
+          "value": true
+        }
+      ]
+    },
+    {
+      "eventId": "F_Z_HALL",
+      "atMinute": 12,
+      "description": "Z: 공용 홀로 연기 일부 누출",
+      "when": [
+        {
+          "path": "world.incidentVariant",
+          "op": "EQ",
+          "value": "Z"
+        }
+      ],
+      "effects": [
+        {
+          "type": "SET",
+          "path": "world.hallSmoke",
+          "value": true
+        }
+      ]
+    },
+    {
+      "eventId": "F_Z_UNIT",
+      "atMinute": 13,
+      "description": "Z: 외벽 개구부에서 다용도실로 유입된 연기가 거실 문틈에 도달",
+      "when": [
+        {
+          "path": "world.incidentVariant",
+          "op": "EQ",
+          "value": "Z"
+        }
+      ],
+      "effects": [
+        {
+          "type": "SET",
+          "path": "world.insideSmoke",
+          "value": true
+        }
+      ]
+    },
+    {
+      "eventId": "F_X_CLEAR",
+      "atMinute": 12,
+      "description": "X: 진압과 13층 세대 안전 확인",
+      "when": [
+        {
+          "path": "world.incidentVariant",
+          "op": "EQ",
+          "value": "X"
+        }
+      ],
+      "effects": [
+        {
+          "type": "SET",
+          "path": "world.clear",
+          "value": true
+        }
+      ]
+    },
+    {
+      "eventId": "F_Y_CLEAR",
+      "atMinute": 17,
+      "description": "Y: 13층 세대 대기 종료, 계단 이용 허가는 아님",
+      "when": [
+        {
+          "path": "world.incidentVariant",
+          "op": "EQ",
+          "value": "Y"
+        }
+      ],
+      "effects": [
+        {
+          "type": "SET",
+          "path": "world.clear",
+          "value": true
+        }
+      ]
+    },
+    {
+      "eventId": "F_RESCUE_READY",
+      "after": {
+        "trigger": "WHEN_BECOMES_TRUE",
+        "delayMinutes": 6,
+        "when": [
+          {
+            "path": "player.refugeReported",
+            "op": "EQ",
+            "value": true
+          }
+        ]
+      },
+      "description": "이미 건물 주변에서 활동하던 현장 구조 인력이 정확한 세대 전용 대피공간 위치를 전달받은 뒤 6분 후 접근하는 작품 설정",
+      "effects": [
+        {
+          "type": "SET",
+          "path": "world.rescueReady",
+          "value": true
         }
       ]
     }
   ],
   "endings": [
-  {
-    "id": "TEST_DONE",
-    "state": "CLEARED",
-    "title": "테스트 종료",
-    "description": "엔딩 기능 검증용입니다.",
-    "requirements": [
-      {
-        "path": "player.reported119",
-        "op": "EQ",
-        "value": true
+    {
+      "id": "SAFE_INSIDE",
+      "state": "CLEARED",
+      "title": "집에서 경보가 멎다",
+      "description": "해당 세대가 안전 확인을 받은 뒤 실내 대기를 마쳤다.",
+      "requirements": [
+        {
+          "path": "world.clear",
+          "op": "EQ",
+          "value": true
+        },
+        {
+          "path": "player.clearHeard",
+          "op": "EQ",
+          "value": true
+        },
+        {
+          "path": "player.exposed",
+          "op": "EQ",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": "EXPOSURE_AT_HOME",
+      "state": "CLEARED",
+      "title": "대기는 끝났지만 기침이 남았다",
+      "description": "세대는 안전했지만 앞서 이용한 계단에서 연기를 흡입해 의료 평가가 필요하다.",
+      "requirements": [
+        {
+          "path": "world.clear",
+          "op": "EQ",
+          "value": true
+        },
+        {
+          "path": "player.exposed",
+          "op": "EQ",
+          "value": true
+        }
+      ]
+    },
+    {
+      "id": "SAFE_OUTSIDE",
+      "state": "CLEARED",
+      "title": "지상에서 호수를 말하다",
+      "description": "집결 지점에 무사히 도착했다. 첫 계단참이 보였을 때 아래층까지 맑은지는 알 수 없었다. 이 경로의 결과는 이후 구간의 시야가 유지됐고 현장대원에게 출구 안내를 받을 수 있었던 조건에서 나왔다.",
+      "requirements": [
+        {
+          "path": "player.location",
+          "op": "EQ",
+          "value": "OUTSIDE"
+        }
+      ]
+    },
+    {
+      "id": "RESCUED",
+      "state": "CLEARED",
+      "title": "1301호, 인계 완료",
+      "description": "연기가 유입된 거실에서 전용 대피공간으로 옮겨 구조대에 인계됐다.",
+      "requirements": [
+        {
+          "path": "world.rescueReady",
+          "op": "EQ",
+          "value": true
+        },
+        {
+          "path": "player.exposed",
+          "op": "EQ",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": "RESCUED_WITH_EXPOSURE",
+      "state": "CLEARED",
+      "title": "구조와 의료 인계",
+      "description": "대피공간에서 구조됐고 앞서 계단에서 흡입한 연기로 의료진에 인계됐다.",
+      "requirements": [
+        {
+          "path": "world.rescueReady",
+          "op": "EQ",
+          "value": true
+        },
+        {
+          "path": "player.exposed",
+          "op": "EQ",
+          "value": true
+        }
+      ]
+    },
+    {
+      "id": "EXPOSURE_FAILURE",
+      "state": "FAILED",
+      "title": "계단에서 자력 대피 실패",
+      "description": "이미 연기를 흡입한 채 시야를 잃은 계단을 다시 내려가다 움직일 수 없게 됐다. 이후 생존 여부는 이야기에서 확정되지 않는다.",
+      "requirements": [
+        {
+          "path": "player.exposed",
+          "op": "EQ",
+          "value": true
+        },
+        {
+          "path": "player.incapacitated",
+          "op": "EQ",
+          "value": true
+        }
+      ]
+    }
+  ],
+  "sourceRefs": {
+    "KOREA_FIRE": "https://www.yeosu.go.kr/contents/2055/fire_2.pdf"
+  },
+  "initialVariants": {
+    "X": {
+      "world": {
+        "incidentVariant": "X"
       }
-    ]
+    },
+    "Y": {
+      "world": {
+        "incidentVariant": "Y"
+      }
+    },
+    "Z": {
+      "world": {
+        "incidentVariant": "Z"
+      }
+    }
   }
-]
 }

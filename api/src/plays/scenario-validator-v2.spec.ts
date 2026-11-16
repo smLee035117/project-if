@@ -20,16 +20,78 @@ describe('validateScenarioV2', () => {
         expect(() => validateScenarioV2(scenario)).not.toThrow();
     });
 
-    function loadTestScenario(): unknown {
-        const filePath = resolve(
-            process.cwd(),
-            '..',
-            'data',
-            'apartment_fire_01.json',
-        );
+    
+    function loadTestScenario(): ScenarioV2 {
+        return {
+            schemaVersion: 2,
+            scenarioId: 'validator_test_01',
+            version: '1.0.0',
+            title: 'Validator 테스트',
+            initialSceneId: 'E01',
 
-        return JSON.parse(readFileSync(filePath, 'utf-8')) as unknown;
+            initialState: {
+                world: {
+                    fireFloor: 10,
+                    insideSmoke: false,
+                },
+                player: {
+                    location: 'HOME_LIVING',
+                    reported119: false,
+                },
+                knowledge: {
+                    knownFacts: ['alarm_heard'],
+                },
+            },
+
+            scenes: [
+                {
+                    id: 'E01',
+                    description: '테스트 장면입니다.',
+                    actions: [
+                        {
+                            id: 'REPORT',
+                            text: '119에 신고한다.',
+                            when: [
+                                {
+                                    path: 'player.reported119',
+                                    op: 'EQ',
+                                    value: false,
+                                },
+                            ],
+                            durationMinutes: 1,
+                            outcomes: [
+                                {
+                                    when: [],
+                                    resultText: '신고했습니다.',
+                                    effects: [
+                                        {
+                                            type: 'SET',
+                                            path: 'player.reported119',
+                                            value: true,
+                                        },
+                                    ],
+                                    transition: {
+                                        type: 'STAY',
+                                    },
+                                },
+                            ],
+                        },
+                    ],
+                },
+            ],
+
+            endings: [
+                {
+                    id: 'TEST_DONE',
+                    state: 'CLEARED',
+                    title: '테스트 종료',
+                    description: '검증용 엔딩입니다.',
+                    requirements: [],
+                },
+            ],
+        };
     }
+
 
     it('존재하지 않는 상태 경로를 거부한다', () => {
         const scenario = loadTestScenario();
@@ -431,6 +493,114 @@ describe('validateScenarioV2', () => {
 
         expect(() => validateScenarioV2(scenario))
             .toThrow('scenes[0].actions[1].id가 중복되었습니다.');
+    });
+
+
+    
+    describe('timeline 검증', () => {
+        function createScenario() {
+            const scenario = loadTestScenario();
+
+            scenario.timeline = [
+                {
+                    eventId: 'ABSOLUTE_EVENT',
+                    description: '3분 후 발생',
+                    atMinute: 3,
+                    when: [],
+                    effects: [
+                        {
+                            type: 'SET',
+                            path: 'world.insideSmoke',
+                            value: true,
+                        },
+                    ],
+                },
+                {
+                    eventId: 'RELATIVE_EVENT',
+                    description: '신고 후 7분 뒤 발생',
+                    after: {
+                        trigger: 'WHEN_BECOMES_TRUE',
+                        delayMinutes: 7,
+                        when: [
+                            {
+                                path: 'player.reported119',
+                                op: 'EQ',
+                                value: true,
+                            },
+                        ],
+                    },
+                    effects: [
+                        {
+                            type: 'SET',
+                            path: 'world.insideSmoke',
+                            value: true,
+                        },
+                    ],
+                },
+            ];
+
+            return scenario;
+        }
+
+        it('절대·상대 시간 이벤트를 허용한다', () => {
+            expect(() =>
+                validateScenarioV2(createScenario())
+            ).not.toThrow();
+        });
+
+        it('동일한 이벤트 ID를 거부한다', () => {
+            const scenario = createScenario();
+
+            scenario.timeline![1]!.eventId = 'ABSOLUTE_EVENT';
+
+            expect(() =>
+                validateScenarioV2(scenario)
+            ).toThrow('eventId가 중복되었습니다.');
+        });
+
+        it('절대·상대 시간을 동시에 지정하면 거부한다', () => {
+            const scenario = createScenario();
+
+            const invalid = {
+                ...scenario,
+                timeline: [
+                    {
+                        ...scenario.timeline![0],
+                        after: {
+                            trigger: 'WHEN_BECOMES_TRUE',
+                            delayMinutes: 7,
+                            when: [],
+                        },
+                    },
+                ],
+            };
+
+            expect(() =>
+                validateScenarioV2(invalid)
+            ).toThrow('시간 설정이 올바르지 않습니다.');
+        });
+
+        it('상대 시간의 지연 시간이 0이면 거부한다', () => {
+            const scenario = createScenario();
+
+            const invalid = {
+                ...scenario,
+                timeline: [
+                    {
+                        ...scenario.timeline![1],
+                        after: {
+                            trigger: 'WHEN_BECOMES_TRUE',
+                            delayMinutes: 0,
+                            when: [],
+                        },
+                    },
+                ],
+            };
+
+            expect(() =>
+                validateScenarioV2(invalid)
+            ).toThrow('delayMinutes가 올바르지 않습니다.');
+        });
     });
 
 

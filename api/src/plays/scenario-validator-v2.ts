@@ -263,6 +263,108 @@ export function validateScenarioV2(value: unknown): asserts value is ScenarioV2 
 
     validateInitialState(value.initialState);
 
+    if (value.timeline !== undefined) {
+        if (!Array.isArray(value.timeline)) {
+            throw new Error('timeline은 배열이어야 합니다.');
+        }
+
+        const eventIds = new Set<string>();
+
+        for (const [index, event] of value.timeline.entries()) {
+            const label = `timeline[${index}]`;
+
+            if (!isRecord(event)) {
+                throw new Error(`${label}는 객체여야 합니다.`);
+            }
+
+            if (!isNonEmptyString(event.eventId)) {
+                throw new Error(`${label}.eventId가 올바르지 않습니다.`);
+            }
+
+            if (eventIds.has(event.eventId)) {
+                throw new Error(`${label}.eventId가 중복되었습니다.`);
+            }
+
+            eventIds.add(event.eventId);
+
+            if (!isNonEmptyString(event.description)) {
+                throw new Error(`${label}.description이 올바르지 않습니다.`);
+            }
+
+            const hasAtMinute = Object.hasOwn(event, 'atMinute');
+            const hasAfter = Object.hasOwn(event, 'after');
+
+            // 절대 시간과 상대 시간은 동시에 사용할 수 없음
+            if (hasAtMinute === hasAfter) {
+                throw new Error(`${label}의 시간 설정이 올바르지 않습니다.`);
+            }
+
+            let conditions: unknown;
+
+            if (hasAtMinute) {
+                if (
+                    typeof event.atMinute !== 'number' ||
+                    !Number.isFinite(event.atMinute) ||
+                    event.atMinute <= 0
+                ) {
+                    throw new Error(`${label}.atMinute가 올바르지 않습니다.`);
+                }
+
+                conditions = event.when;
+            } else {
+                if (!isRecord(event.after)) {
+                    throw new Error(`${label}.after가 올바르지 않습니다.`);
+                }
+
+                if (event.after.trigger !== 'WHEN_BECOMES_TRUE') {
+                    throw new Error(`${label}.after.trigger가 올바르지 않습니다.`);
+                }
+
+                if (
+                    typeof event.after.delayMinutes !== 'number' ||
+                    !Number.isFinite(event.after.delayMinutes) ||
+                    event.after.delayMinutes <= 0
+                ) {
+                    throw new Error(`${label}.after.delayMinutes가 올바르지 않습니다.`);
+                }
+
+                if (Object.hasOwn(event, 'when')) {
+                    throw new Error(`${label}.when은 after.when을 사용해야 합니다.`);
+                }
+
+                conditions = event.after.when;
+            }
+
+            if (!Array.isArray(conditions)) {
+                throw new Error(`${label}의 조건은 배열이어야 합니다.`);
+            }
+
+            for (const [i, condition] of conditions.entries()) {
+                validateCondition(
+                    condition,
+                    `${label}.when[${i}]`,
+                    value.initialState,
+                );
+            }
+
+            if (
+                !Array.isArray(event.effects) ||
+                event.effects.length === 0
+            ) {
+                throw new Error(`${label}.effects가 올바르지 않습니다.`);
+            }
+
+            for (const [i, effect] of event.effects.entries()) {
+                validateEffect(
+                    effect,
+                    `${label}.effects[${i}]`,
+                    value.initialState,
+                );
+            }
+        }
+    }
+
+
 
 
 if (value.timeEvents !== undefined) {
@@ -408,9 +510,61 @@ if (value.timeEvents !== undefined) {
 
         sceneIds.add(scene.id);
 
-        if (!isNonEmptyString(scene.description)) {
-            throw new Error(`${sceneLabel}.description이 올바르지 않습니다.`);
+        
+        if (
+        scene.location !== undefined &&
+        !isNonEmptyString(scene.location)
+        ) {
+        throw new Error(`${sceneLabel}.location이 올바르지 않습니다.`);
         }
+
+        if (
+        scene.description !== undefined &&
+        !isNonEmptyString(scene.description)
+        ) {
+        throw new Error(`${sceneLabel}.description이 올바르지 않습니다.`);
+        }
+
+        if (scene.narratives !== undefined) {
+        if (
+            !Array.isArray(scene.narratives) ||
+            scene.narratives.length === 0
+        ) {
+            throw new Error(`${sceneLabel}.narratives가 올바르지 않습니다.`);
+        }
+
+        for (const [index, narrative] of scene.narratives.entries()) {
+            const label = `${sceneLabel}.narratives[${index}]`;
+
+            if (!isRecord(narrative)) {
+            throw new Error(`${label}는 객체여야 합니다.`);
+            }
+
+            if (!isNonEmptyString(narrative.text)) {
+            throw new Error(`${label}.text가 올바르지 않습니다.`);
+            }
+
+            if (!Array.isArray(narrative.when)) {
+            throw new Error(`${label}.when은 배열이어야 합니다.`);
+            }
+
+            for (const [i, condition] of narrative.when.entries()) {
+            validateCondition(
+                condition,
+                `${label}.when[${i}]`,
+                value.initialState,
+            );
+            }
+        }
+        }
+
+        if (
+        !isNonEmptyString(scene.description) &&
+        scene.narratives === undefined
+        ) {
+        throw new Error(`${sceneLabel}에 장면 서술이 없습니다.`);
+        }
+
 
         if (!Array.isArray(scene.actions)) {
             throw new Error(`${sceneLabel}.actions는 배열이어야 합니다.`);

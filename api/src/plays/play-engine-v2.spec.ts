@@ -74,44 +74,62 @@ test('서로 다른 플레이는 상태 객체를 공유하지 않는다', () =>
     expect(scenario.initialState.player.reported119).toBe(false);
 });
 
-test('E01-A 행동 실행 시 상태, 시간, 버전이 갱신된다', async () => {
 
-    // 1. V2 시나리오 로딩
-  const scenario = await loadScenarioV2('apartment_fire_01');
+test('E01-A 행동 실행 시 상태, 시간, 버전이 갱신된다', () => {
+    const testScenario = structuredClone(scenario);
 
-    // 2. 초기 PlayDataV2 생성
-    const playA = createInitialPlayDataV2(scenario, 4, 0);
+    const startScene = testScenario.scenes[0];
 
+    if (!startScene) {
+        throw new Error('테스트 시작 장면이 없습니다.');
+    }
 
-    // 3. executeActionV2() 실행
-    const {
-        playData: nextState,
-        resultText,
-    } = executeActionV2(playA, scenario, 'E01-A');
+    startScene.actions.push({
+        id: 'E01-A',
+        text: '119에 신고한다.',
+        when: [],
+        durationMinutes: 1,
+        outcomes: [
+            {
+                when: [],
+                resultText: '119에 현재 상황을 신고했습니다.',
+                effects: [
+                    {
+                        type: 'SET',
+                        path: 'player.reported119',
+                        value: true,
+                    },
+                ],
+                transition: { type: 'STAY' },
+            },
+        ],
+    });
 
+    const original = createInitialPlayDataV2(
+        testScenario, 4, 0,
+    );
 
-    // 4. 실행 결과 검증
-    // reported119: true
-    // storyTimeMinutes: 1
-    // version: 1
-    // currentStageId: 'E01'
-    expect(nextState.scenarioState.player.reported119).toBe(true);
-    expect(nextState.storyTimeMinutes).toBe(1);
-    expect(nextState.version).toBe(1);
-    expect(nextState.currentStageId).toBe('E01');
+    const { playData: result, resultText } =
+        executeActionV2(original, testScenario, 'E01-A');
 
-
-    // 5. 원본 PlayDataV2가 변경되지 않았는지 검증
-
-    
-    // 원본 상태 유지 확인
-    expect(playA.scenarioState.player.reported119).toBe(false);
-    expect(playA.storyTimeMinutes).toBe(0);
-    expect(playA.version).toBe(0);
-
-    // 원본과 반환 객체가 다른지 확인
-    expect(nextState).not.toBe(playA);
-
+    expect(result.scenarioState.player.reported119).toBe(true);
+    expect(result.storyTimeMinutes).toBe(1);
+    expect(result.version).toBe(1);
+    expect(result.currentStageId).toBe('E01');
     expect(resultText).toBe('119에 현재 상황을 신고했습니다.');
 
+    // 새 시간 이벤트 진행 상태 확인
+    expect(result.timelineProgress).toEqual({
+        pending: {},
+        processed: [],
+    });
+
+    // 원본 불변성 확인
+    expect(original.scenarioState.player.reported119).toBe(false);
+    expect(original.storyTimeMinutes).toBe(0);
+    expect(original.version).toBe(0);
+    expect(original.timelineProgress).toEqual({
+        pending: {},
+        processed: [],
+    });
 });

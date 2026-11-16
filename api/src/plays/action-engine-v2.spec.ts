@@ -170,6 +170,7 @@ test('GOTO 실행 시 장면이 변경되고 원본은 유지된다', () => {
         id: 'E02',
         description: '다음 장면',
         actions: [],
+        location: 'HOME_ENTRY',
     });
 
     startScene.actions.push({
@@ -201,11 +202,15 @@ test('GOTO 실행 시 장면이 변경되고 원본은 유지된다', () => {
     expect(result.storyTimeMinutes).toBe(2);
     expect(resultText).toBe('다음 장면에 도착했습니다.');
 
+    expect(result.scenarioState.player.location).toBe('HOME_ENTRY');
+
     // 원본 데이터는 변경되지 않아야 함
     expect(original.currentStageId).toBe('E01');
     expect(original.version).toBe(0);
     expect(original.storyTimeMinutes).toBe(0);
     expect(result).not.toBe(original);
+
+    expect(original.scenarioState.player.location).toBe('HOME_LIVING');
 });
 
 
@@ -796,4 +801,67 @@ test('연속 행동에서 시간이 누적되고 과거 이벤트는 재실행�
 
     expect(original.storyTimeMinutes).toBe(0);
     expect(original.scenarioState.world.fireFloor).toBe(10);
+});
+
+
+
+test('timeline 절대 시간 사건이 행동 결과에 반영된다', () => {
+    const testScenario = structuredClone(scenario);
+
+    testScenario.timeline = [
+        {
+            eventId: 'FIRE_SPREAD',
+            description: '3분 후 화재 상황 변화',
+            atMinute: 3,
+            when: [],
+            effects: [
+                {
+                    type: 'SET',
+                    path: 'world.insideSmoke',
+                    value: true,
+                },
+            ],
+        },
+    ];
+
+    testScenario.scenes[0]!.actions.push({
+        id: 'WAIT',
+        text: '5분 기다린다.',
+        when: [],
+        durationMinutes: 5,
+        outcomes: [
+            {
+                when: [
+                    {
+                        path: 'world.insideSmoke',
+                        op: 'EQ',
+                        value: true,
+                    },
+                ],
+                resultText: '연기가 유입됐습니다.',
+                effects: [],
+                transition: { type: 'STAY' },
+            },
+        ],
+    });
+
+    const original = createInitialPlayDataV2(
+        testScenario, 4, 0,
+    );
+
+    const result = executeActionV2(
+        original,
+        testScenario,
+        'WAIT',
+    );
+
+    expect(result.playData.storyTimeMinutes).toBe(5);
+    expect(result.playData.scenarioState.world.insideSmoke)
+        .toBe(true);
+    expect(result.resultText).toBe('연기가 유입됐습니다.');
+
+    // 원본 상태는 변경되지 않아야 함
+    expect(original.storyTimeMinutes).toBe(0);
+    expect(original.scenarioState.world.insideSmoke)
+        .toBe(false);
 });

@@ -1,0 +1,891 @@
+{
+  "schemaVersion": 2,
+  "schemaRevision": "2.0.0-rc2",
+  "scenarioId": "blackout_resource_01",
+  "version": "0.3.0-content.3",
+  "title": "불이 꺼진 도시",
+  "description": "겨울 저녁, 두 단지의 전력이 끊긴다. 남은 자원과 늦게 들어오는 소식으로 밤을 계획한다.",
+  "clock": {
+    "unit": "MINUTE",
+    "mode": "ACTION_DRIVEN",
+    "eventOrder": "AT_ACTION_END_BEFORE_OUTCOME",
+    "crossingPolicy": "APPLY_DURING_ACTION_RESOLVE_AT_END"
+  },
+  "initialSceneId": "B_HOME",
+  "initialState": {
+    "world": {
+      "supportOpen": false,
+      "restored": false
+    },
+    "player": {
+      "location": "HOME",
+      "phone": 8,
+      "bank": true,
+      "water": 2,
+      "food": 1,
+      "ready": false,
+      "shared": false,
+      "spentMeal": false,
+      "checkedEarly": false,
+      "notice": false,
+      "boardEarly": false
+    },
+    "knowledge": {
+      "knownFacts": []
+    }
+  },
+  "scenes": [
+    {
+      "id": "B_HOME",
+      "location": "HOME",
+      "narratives": [
+        {
+          "when": [],
+          "text": "겨울 저녁 18시 10분, 아파트 8층. 평소 전동 펌프로 공급되던 이 동 주방 수돗물도 끊겼고, 냉장고의 전원은 들어오지 않는다. 전등과 냉장고가 한꺼번에 멎었다. 건너 동 창도 어둡다. 현관 수납장에 손전등과 두꺼운 겉옷이 있고, 집에는 마실 물은 생수 두 병이고 바로 먹을 수 있는 상온식 한 팩이 남았다. 8층 주방 수도에서 물이 나오지 않는다. 수도가 언제 정상으로 돌아올지는 모른다. 휴대전화는 몇 차례 통신하면 다시 충전해야 할 정도다. 오늘 밤 어디서 지낼지, 집에 남는다면 아침까지 마실 물을 어떻게 남길지 결정해야 한다."
+        }
+      ],
+      "actions": [
+        {
+          "id": "B_LIGHT",
+          "text": "손전등과 두꺼운 겉옷을 현관에 챙긴다",
+          "when": [
+            {
+              "path": "player.ready",
+              "op": "EQ",
+              "value": false
+            }
+          ],
+          "durationMinutes": 10,
+          "outcomes": [
+            {
+              "when": [],
+              "resultText": "손전등은 정상이다. 두꺼운 옷을 걸치고, 나갈 수 있게 현관에 가방을 둔다.",
+              "effects": [
+                {
+                  "type": "SET",
+                  "path": "player.ready",
+                  "value": true
+                }
+              ],
+              "transition": {
+                "type": "STAY"
+              }
+            }
+          ]
+        },
+        {
+          "id": "B_CHECK_FIRST",
+          "text": "휴대전화로 관리실 공지를 새로 확인한다",
+          "when": [
+            {
+              "path": "player.phone",
+              "op": "GTE",
+              "value": 4
+            },
+            {
+              "path": "player.notice",
+              "op": "EQ",
+              "value": false
+            },
+            {
+              "path": "player.checkedEarly",
+              "op": "EQ",
+              "value": false
+            }
+          ],
+          "durationMinutes": 25,
+          "outcomes": [
+            {
+              "when": [
+                {
+                  "path": "world.supportOpen",
+                  "op": "EQ",
+                  "value": false
+                }
+              ],
+              "resultText": "관리실 공지에 인근 두 단지 변전 설비 구간 점검 중이라고 적혔다. 복구 예상 시각과 지원 장소는 아직 없다.",
+              "effects": [
+                {
+                  "type": "ADD",
+                  "path": "player.phone",
+                  "value": -4
+                },
+                {
+                  "type": "SET",
+                  "path": "player.checkedEarly",
+                  "value": true
+                }
+              ],
+              "transition": {
+                "type": "STAY"
+              }
+            },
+            {
+              "when": [
+                {
+                  "path": "world.supportOpen",
+                  "op": "EQ",
+                  "value": true
+                }
+              ],
+              "resultText": "1층 관리동 주민회의실이 문을 열었다. 생수와 담요가 있고, 회의실까지의 실외 통로가 확보됐다는 주소와 안내를 저장한다.",
+              "effects": [
+                {
+                  "type": "ADD",
+                  "path": "player.phone",
+                  "value": -4
+                },
+                {
+                  "type": "SET",
+                  "path": "player.notice",
+                  "value": true
+                },
+                {
+                  "type": "APPEND_UNIQUE",
+                  "path": "knowledge.knownFacts",
+                  "value": "SUPPORT_ADDRESS"
+                }
+              ],
+              "transition": {
+                "type": "STAY"
+              }
+            }
+          ]
+        },
+        {
+          "id": "B_CHECK_AGAIN",
+          "text": "휴대전화로 관리실 공지를 새로 확인한다",
+          "when": [
+            {
+              "path": "player.phone",
+              "op": "GTE",
+              "value": 4
+            },
+            {
+              "path": "player.notice",
+              "op": "EQ",
+              "value": false
+            },
+            {
+              "path": "player.checkedEarly",
+              "op": "EQ",
+              "value": true
+            }
+          ],
+          "durationMinutes": 25,
+          "outcomes": [
+            {
+              "when": [
+                {
+                  "path": "world.supportOpen",
+                  "op": "EQ",
+                  "value": false
+                }
+              ],
+              "resultText": "관리실 공지에 인근 두 단지 변전 설비 구간 점검 중이라고 적혔다. 복구 예상 시각과 지원 장소는 아직 없다.",
+              "effects": [
+                {
+                  "type": "ADD",
+                  "path": "player.phone",
+                  "value": -4
+                },
+                {
+                  "type": "SET",
+                  "path": "player.checkedEarly",
+                  "value": true
+                }
+              ],
+              "transition": {
+                "type": "STAY"
+              }
+            },
+            {
+              "when": [
+                {
+                  "path": "world.supportOpen",
+                  "op": "EQ",
+                  "value": true
+                }
+              ],
+              "resultText": "1층 관리동 주민회의실이 문을 열었다. 생수와 담요가 있고, 회의실까지의 실외 통로가 확보됐다는 주소와 안내를 저장한다.",
+              "effects": [
+                {
+                  "type": "ADD",
+                  "path": "player.phone",
+                  "value": -4
+                },
+                {
+                  "type": "SET",
+                  "path": "player.notice",
+                  "value": true
+                },
+                {
+                  "type": "APPEND_UNIQUE",
+                  "path": "knowledge.knownFacts",
+                  "value": "SUPPORT_ADDRESS"
+                }
+              ],
+              "transition": {
+                "type": "STAY"
+              }
+            }
+          ]
+        },
+        {
+          "id": "B_CHARGE",
+          "text": "작은 보조배터리로 전화기를 한 번 충전한다",
+          "when": [
+            {
+              "path": "player.bank",
+              "op": "EQ",
+              "value": true
+            }
+          ],
+          "durationMinutes": 20,
+          "outcomes": [
+            {
+              "when": [],
+              "resultText": "보조배터리 표시등이 끝까지 내려갔다. 전화기에 한 차례 공지를 받을 만큼 전력이 들어왔다.",
+              "effects": [
+                {
+                  "type": "ADD",
+                  "path": "player.phone",
+                  "value": 4
+                },
+                {
+                  "type": "SET",
+                  "path": "player.bank",
+                  "value": false
+                }
+              ],
+              "transition": {
+                "type": "STAY"
+              }
+            }
+          ]
+        },
+        {
+          "id": "B_SHARE",
+          "text": "아이에게 줄 물을 구하러 온 이웃에게, 내 몫 두 병 중 한 병을 건넨다",
+          "when": [
+            {
+              "path": "player.shared",
+              "op": "EQ",
+              "value": false
+            },
+            {
+              "path": "player.spentMeal",
+              "op": "EQ",
+              "value": false
+            }
+          ],
+          "durationMinutes": 10,
+          "outcomes": [
+            {
+              "when": [],
+              "resultText": "현관 앞 이웃이 물병을 받아 아이가 있는 집으로 돌아간다. 저녁에 남은 한 병까지 사용하면 집에 마실 물이 없다. 다음 급수나 지원 장소를 확인할 필요가 있다. 이웃은 관리실에서 지원 소식을 들으면 알려 주겠다고 한다.",
+              "effects": [
+                {
+                  "type": "ADD",
+                  "path": "player.water",
+                  "value": -1
+                },
+                {
+                  "type": "SET",
+                  "path": "player.shared",
+                  "value": true
+                }
+              ],
+              "transition": {
+                "type": "STAY"
+              }
+            }
+          ]
+        },
+        {
+          "id": "B_MEAL",
+          "text": "상온식으로 저녁을 먹고 생수 한 병을 오늘 저녁 몫으로 쓴다",
+          "when": [
+            {
+              "path": "player.food",
+              "op": "GTE",
+              "value": 1
+            },
+            {
+              "path": "player.water",
+              "op": "GTE",
+              "value": 1
+            }
+          ],
+          "durationMinutes": 20,
+          "outcomes": [
+            {
+              "when": [],
+              "resultText": "상온식 한 팩을 비우고 생수 한 병을 오늘 저녁 동안 마신다. 냉장고 안의 식품은 정전 후 상태를 확인할 때까지 그대로 둔다.",
+              "effects": [
+                {
+                  "type": "ADD",
+                  "path": "player.water",
+                  "value": -1
+                },
+                {
+                  "type": "ADD",
+                  "path": "player.food",
+                  "value": -1
+                },
+                {
+                  "type": "SET",
+                  "path": "player.spentMeal",
+                  "value": true
+                }
+              ],
+              "transition": {
+                "type": "STAY"
+              }
+            }
+          ]
+        },
+        {
+          "id": "B_BOARD",
+          "text": "문밖 복도에서 관리 직원이 붙이는 종이 안내를 확인한다",
+          "when": [
+            {
+              "path": "player.notice",
+              "op": "EQ",
+              "value": false
+            },
+            {
+              "path": "player.ready",
+              "op": "EQ",
+              "value": true
+            },
+            {
+              "path": "player.boardEarly",
+              "op": "EQ",
+              "value": false
+            }
+          ],
+          "durationMinutes": 20,
+          "outcomes": [
+            {
+              "when": [
+                {
+                  "path": "world.supportOpen",
+                  "op": "EQ",
+                  "value": false
+                }
+              ],
+              "resultText": "복도 게시판에 아직 정전 접수 번호만 붙어 있다. 직원이 당분간 복구 시각을 알 수 없다고 전한다.",
+              "effects": [
+                {
+                  "type": "SET",
+                  "path": "player.boardEarly",
+                  "value": true
+                }
+              ],
+              "transition": {
+                "type": "STAY"
+              }
+            },
+            {
+              "when": [
+                {
+                  "path": "world.supportOpen",
+                  "op": "EQ",
+                  "value": true
+                }
+              ],
+              "resultText": "종이 안내에서 1층 관리동 주민회의실 위치를 확인한다. 생수와 담요를 나눠 준다고 적혀 있다.",
+              "effects": [
+                {
+                  "type": "SET",
+                  "path": "player.notice",
+                  "value": true
+                },
+                {
+                  "type": "APPEND_UNIQUE",
+                  "path": "knowledge.knownFacts",
+                  "value": "SUPPORT_ADDRESS"
+                }
+              ],
+              "transition": {
+                "type": "STAY"
+              }
+            }
+          ]
+        },
+        {
+          "id": "B_BOARD_RECHECK",
+          "text": "다시 문을 열고 종이 안내가 바뀌었는지 본다",
+          "when": [
+            {
+              "path": "player.notice",
+              "op": "EQ",
+              "value": false
+            },
+            {
+              "path": "player.ready",
+              "op": "EQ",
+              "value": true
+            },
+            {
+              "path": "player.boardEarly",
+              "op": "EQ",
+              "value": true
+            }
+          ],
+          "durationMinutes": 25,
+          "outcomes": [
+            {
+              "when": [
+                {
+                  "path": "world.supportOpen",
+                  "op": "EQ",
+                  "value": false
+                }
+              ],
+              "resultText": "아직 같은 공지다. 현관으로 돌아와 문을 닫는다.",
+              "effects": [],
+              "transition": {
+                "type": "STAY"
+              }
+            },
+            {
+              "when": [
+                {
+                  "path": "world.supportOpen",
+                  "op": "EQ",
+                  "value": true
+                }
+              ],
+              "resultText": "새 종이 안내의 약도를 읽는다. 1층 출입문에서 관리동까지 실외 길이 표시돼 있다.",
+              "effects": [
+                {
+                  "type": "SET",
+                  "path": "player.notice",
+                  "value": true
+                },
+                {
+                  "type": "APPEND_UNIQUE",
+                  "path": "knowledge.knownFacts",
+                  "value": "SUPPORT_ADDRESS"
+                }
+              ],
+              "transition": {
+                "type": "STAY"
+              }
+            }
+          ]
+        },
+        {
+          "id": "B_CROSS",
+          "text": "손전등을 들고 계단으로 내려가 관리동 지원실로 간다",
+          "when": [
+            {
+              "path": "player.ready",
+              "op": "EQ",
+              "value": true
+            },
+            {
+              "path": "knowledge.knownFacts",
+              "op": "INCLUDES",
+              "value": "SUPPORT_ADDRESS"
+            }
+          ],
+          "durationMinutes": 25,
+          "outcomes": [
+            {
+              "when": [],
+              "resultText": "건물 현관을 나와 안내의 약도대로 관리동까지 간다. 주민회의실 문 안에서 물병을 정리하는 직원이 보인다.",
+              "effects": [],
+              "transition": {
+                "type": "GOTO",
+                "sceneId": "B_SUPPORT"
+              }
+            }
+          ]
+        },
+        {
+          "id": "B_RELOCATE",
+          "text": "손전등을 들고 비상등이 켜진 1층 경비실 앞까지 간다",
+          "when": [
+            {
+              "path": "player.ready",
+              "op": "EQ",
+              "value": true
+            },
+            {
+              "path": "player.spentMeal",
+              "op": "EQ",
+              "value": true
+            },
+            {
+              "path": "player.water",
+              "op": "EQ",
+              "value": 0
+            },
+            {
+              "path": "player.notice",
+              "op": "EQ",
+              "value": false
+            }
+          ],
+          "durationMinutes": 25,
+          "outcomes": [
+            {
+              "when": [],
+              "resultText": "경비실 앞에 도착했다. 집에 마실 물이 남지 않아 당직자에게 임시 지원을 요청할 수 있다.",
+              "effects": [],
+              "transition": {
+                "type": "GOTO",
+                "sceneId": "B_GUARD"
+              }
+            }
+          ]
+        },
+        {
+          "id": "B_WAIT",
+          "text": "실내에서 한 시간 반 동안 쉬며 복구 방송을 기다린다",
+          "when": [],
+          "durationMinutes": 90,
+          "outcomes": [
+            {
+              "when": [
+                {
+                  "path": "world.restored",
+                  "op": "EQ",
+                  "value": true
+                }
+              ],
+              "resultText": "주방 환풍기 표시등이 다시 켜지고 복도 조명도 돌아왔다. 관리실은 전력 복구는 확인했지만 이 동의 급수 설비는 아직 점검 중이라고 방송한다.",
+              "effects": [
+                {
+                  "type": "APPEND_UNIQUE",
+                  "path": "knowledge.knownFacts",
+                  "value": "POWER_CONFIRMED"
+                }
+              ],
+              "transition": {
+                "type": "GOTO",
+                "sceneId": "B_RESTORED"
+              }
+            },
+            {
+              "when": [
+                {
+                  "path": "world.restored",
+                  "op": "EQ",
+                  "value": false
+                },
+                {
+                  "path": "player.ready",
+                  "op": "EQ",
+                  "value": true
+                }
+              ],
+              "resultText": "겉옷 지퍼를 올리니 몸은 조금 덜 식는다. 복구 방송은 아직 없다.",
+              "effects": [],
+              "transition": {
+                "type": "STAY"
+              }
+            },
+            {
+              "when": [
+                {
+                  "path": "world.restored",
+                  "op": "EQ",
+                  "value": false
+                },
+                {
+                  "path": "player.ready",
+                  "op": "EQ",
+                  "value": false
+                }
+              ],
+              "resultText": "손이 식어 컵도 차갑게 느껴진다. 복구 방송은 아직 없다. 현관 수납장에 둔 겉옷을 떠올린다.",
+              "effects": [],
+              "transition": {
+                "type": "STAY"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "B_SUPPORT",
+      "location": "SUPPORT_ROOM",
+      "narratives": [
+        {
+          "when": [],
+          "text": "관리동 주민회의실이다. 직원이 이름과 동·호수를 확인하고, 남은 담요와 물을 배분한다."
+        }
+      ],
+      "actions": [
+        {
+          "id": "B_SIGN",
+          "text": "관리 직원에게 도착을 알리고 오늘 밤 머물 자리를 받는다",
+          "when": [],
+          "durationMinutes": 5,
+          "outcomes": [
+            {
+              "when": [],
+              "resultText": "휴대전화를 더 켜지 않아도 복구 소식을 들을 수 있다. 직원이 의자를 내주고 다음 방송 시간을 알려 준다.",
+              "effects": [],
+              "transition": {
+                "type": "END",
+                "endingId": "SHELTER_REACHED"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "B_GUARD",
+      "location": "GUARD_POST",
+      "narratives": [
+        {
+          "when": [],
+          "text": "1층 경비실 앞이다. 통로 조명은 작동 중이다. 담당자에게 현재 상황을 설명한다."
+        }
+      ],
+      "actions": [
+        {
+          "id": "B_GUARD_END",
+          "text": "남은 물과 체온 상태를 설명하고 지원을 부탁한다",
+          "when": [],
+          "durationMinutes": 5,
+          "outcomes": [
+            {
+              "when": [],
+              "resultText": "담당자가 생수와 대기할 자리를 안내한다. 집에서 버티겠다는 목표는 이루지 못했지만 이제 혼자 해결할 필요는 없다.",
+              "effects": [],
+              "transition": {
+                "type": "END",
+                "endingId": "HOME_PLAN_FAILED"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "B_RESTORED",
+      "location": "HOME",
+      "narratives": [
+        {
+          "when": [],
+          "text": "집 안에 전등이 돌아왔다. 그러나 수도꼭지를 틀어도 물은 나오지 않는다. 전력 복구와 식수 확보는 별개의 문제다. 냉장고 문을 닫아 둔 상태와 몇 시간 동안 전원이 없었다는 사실을 기억한다."
+        }
+      ],
+      "actions": [
+        {
+          "id": "B_AFTER_RESTORE_SUPPORT",
+          "text": "급수가 아직 끊겨 있으니 확인해 둔 관리동 지원실로 이동한다",
+          "when": [
+            {
+              "path": "player.water",
+              "op": "EQ",
+              "value": 0
+            },
+            {
+              "path": "player.ready",
+              "op": "EQ",
+              "value": true
+            },
+            {
+              "path": "knowledge.knownFacts",
+              "op": "INCLUDES",
+              "value": "SUPPORT_ADDRESS"
+            }
+          ],
+          "durationMinutes": 25,
+          "outcomes": [
+            {
+              "when": [],
+              "resultText": "전등은 돌아왔지만 수도는 여전히 나오지 않는다. 앞서 확인한 약도대로 계단을 내려가 관리동 지원실에 도착한다. 직원에게 물병을 받고 급수 설비 점검 상황을 묻는다.",
+              "effects": [],
+              "transition": {
+                "type": "GOTO",
+                "sceneId": "B_SUPPORT"
+              }
+            }
+          ]
+        },
+        {
+          "id": "B_AFTER_RESTORE_GUARD",
+          "text": "집에 식수가 없으니 1층 경비실에 임시 지원을 요청한다",
+          "when": [
+            {
+              "path": "player.water",
+              "op": "EQ",
+              "value": 0
+            },
+            {
+              "path": "player.ready",
+              "op": "EQ",
+              "value": true
+            }
+          ],
+          "durationMinutes": 15,
+          "outcomes": [
+            {
+              "when": [],
+              "resultText": "준비해 둔 손전등을 챙겨 비상등이 켜진 계단을 내려간다. 경비실에 도착해 급수 중단과 현재 식수 상황을 알린다.",
+              "effects": [],
+              "transition": {
+                "type": "GOTO",
+                "sceneId": "B_GUARD"
+              }
+            }
+          ]
+        },
+        {
+          "id": "B_END",
+          "text": "오늘 밤 남은 준비를 정리한다",
+          "when": [],
+          "durationMinutes": 5,
+          "outcomes": [
+            {
+              "when": [
+                {
+                  "path": "player.water",
+                  "op": "EQ",
+                  "value": 0
+                }
+              ],
+              "resultText": "불이 돌아왔지만 수도는 아직 나오지 않는다. 이웃에게 물을 나눈 뒤 남은 한 병도 저녁에 썼다. 이제 집에서 더 기다리기보다는 관리실에 식수 지원을 요청하기로 한다.",
+              "effects": [],
+              "transition": {
+                "type": "END",
+                "endingId": "HOME_STOCKOUT"
+              }
+            },
+            {
+              "when": [
+                {
+                  "path": "player.water",
+                  "op": "GTE",
+                  "value": 1
+                }
+              ],
+              "resultText": "마실 물이 남아 있다. 냉장식품의 안전을 전원 복구만으로 판단하지 않고 따로 확인할 것을 적어 둔다.",
+              "effects": [],
+              "transition": {
+                "type": "END",
+                "endingId": "RESTORED_AT_HOME"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "timeline": [
+    {
+      "eventId": "B_SUPPORT_OPENS",
+      "atMinute": 180,
+      "description": "관리동 주민회의실에 물과 담요가 도착",
+      "when": [],
+      "effects": [
+        {
+          "type": "SET",
+          "path": "world.supportOpen",
+          "value": true
+        }
+      ]
+    },
+    {
+      "eventId": "B_RESTORE",
+      "atMinute": 330,
+      "description": "격리·전환 작업 후 단지 전력 복구",
+      "when": [],
+      "effects": [
+        {
+          "type": "SET",
+          "path": "world.restored",
+          "value": true
+        }
+      ]
+    }
+  ],
+  "endings": [
+    {
+      "id": "SHELTER_REACHED",
+      "state": "CLEARED",
+      "title": "관리동에 도착",
+      "description": "공식 안내를 찾아 지원실에서 자리를 확보했다.",
+      "requirements": [
+        {
+          "path": "player.location",
+          "op": "EQ",
+          "value": "SUPPORT_ROOM"
+        },
+        {
+          "path": "knowledge.knownFacts",
+          "op": "INCLUDES",
+          "value": "SUPPORT_ADDRESS"
+        }
+      ]
+    },
+    {
+      "id": "HOME_PLAN_FAILED",
+      "state": "FAILED",
+      "title": "집에 남을 계획을 접다",
+      "description": "집의 식수가 바닥나 경비실에서 임시 지원을 요청했다. 실내 대기 계획은 끝났지만 필요한 도움을 구할 수 있었다.",
+      "requirements": [
+        {
+          "path": "player.location",
+          "op": "EQ",
+          "value": "GUARD_POST"
+        },
+        {
+          "path": "player.water",
+          "op": "EQ",
+          "value": 0
+        }
+      ]
+    },
+    {
+      "id": "HOME_STOCKOUT",
+      "state": "FAILED",
+      "title": "불은 밝았지만 물은 남지 않았다",
+      "description": "전력 복구 뒤에도 급수가 돌아오지 않았다. 집에서 마실 식수를 다시 마련하지 못했으므로 실내 대기 계획을 끝내고 지원을 요청한다.",
+      "requirements": [
+        {
+          "path": "world.restored",
+          "op": "EQ",
+          "value": true
+        },
+        {
+          "path": "player.water",
+          "op": "EQ",
+          "value": 0
+        }
+      ]
+    },
+    {
+      "id": "RESTORED_AT_HOME",
+      "state": "CLEARED",
+      "title": "마지막 병을 남기다",
+      "description": "집에서 필요한 자원을 유지하며 전력 복구를 맞았다.",
+      "requirements": [
+        {
+          "path": "world.restored",
+          "op": "EQ",
+          "value": true
+        },
+        {
+          "path": "player.water",
+          "op": "GTE",
+          "value": 1
+        }
+      ]
+    }
+  ],
+  "sourceRefs": {
+    "KOREA_POWER": "https://www.yeonsu.go.kr/UpFiles/board_1/%EC%9E%AC%EB%82%9C%EB%B0%9C%EC%83%9D_%EC%8B%9C_%EA%B5%AD%EB%AF%BC%ED%96%89%EB%8F%99%EC%9A%94%EB%A0%B9.pdf",
+    "CDC_FOOD": "https://www.cdc.gov/food-safety/foods/keep-food-safe-after-emergency.html"
+  }
+}

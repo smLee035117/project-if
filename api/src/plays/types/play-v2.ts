@@ -19,6 +19,7 @@ export interface PlayDataV2 extends PlayData {
     storyTimeMinutes: number;
     scenarioState: ScenarioState;
     endingId?: string;
+    timelineProgress: TimelineProgressV2;
 }
 
 
@@ -26,4 +27,12 @@ export interface PlayDataV2 extends PlayData {
 export type ExecuteActionResultV2 = {
     playData: PlayDataV2;
     resultText: string;
+};
+
+export type TimelineProgressV2 = {
+    // eventId → 실행 예정 게임 시각
+    pending: Record<string, number>;
+
+    // 이미 처리했거나 조건 불충족으로 건너뛴 사건
+    processed: string[];
 };

@@ -1,6 +1,6 @@
 
-import type { PlayDataV2 } from './types/play-v2.js';
-import type { ScenarioV2 } from './types/scenario-v2.js';
+import type { PlayDataV2 , ScenarioState} from './types/play-v2.js';
+import type { ScenarioV2 , SceneV2} from './types/scenario-v2.js';
 import type {
     PlayViewV2,
     PlayActionViewV2,
@@ -83,10 +83,52 @@ export function buildPlayViewV2(
         state: playData.state,
         version: playData.version,
         currentSceneId: scene.id,
-        sceneDescription: scene.description,
+        sceneDescription: resolveSceneDescription(
+            scene,
+            playData.scenarioState,
+            ),
         storyTimeMinutes: playData.storyTimeMinutes,
         knownFacts: [...playData.scenarioState.knowledge.knownFacts],
         actions,
         ...(ending ? { ending } : {}),
     };
+}
+
+
+function resolveSceneDescription(
+  scene: SceneV2,
+  state: ScenarioState,
+): string {
+  // 1. narratives가 있다면 when 조건에 맞는 서술 검색
+  // 2. 일치하는 서술은 정확히 하나여야 함
+  // 3. narratives가 없다면 기존 description 사용
+  // 4. 유효한 서술이 없으면 오류 발생
+
+  if (typeof scene.narratives === 'undefined') {
+         if (typeof scene.description === 'undefined') {
+            throw new Error('유효한 서술이 존재하지 않습니다.');
+        }
+
+        return scene.description;
+    }
+
+    const result: string[] = [];
+  for(const narrative of scene.narratives) {
+    if(evaluateConditions(state, narrative.when)) {
+        result.push(narrative.text);
+    }
+
+  }
+
+  const description = result[0];
+
+  if(result.length !== 1 || description === undefined) {
+    throw new Error(`장면 ${scene.id}: 일치하는 서술 ${result.length}개`);
+  } else {
+    return result[0];
+  }
+
+
+
+
 }

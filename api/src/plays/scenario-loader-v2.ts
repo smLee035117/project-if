@@ -7,7 +7,10 @@ import { validateScenarioV2 } from './scenario-validator-v2.js';
 import { ScenarioNotFoundError } from './scenario-loader.js';
 
 const scenarioFiles: Record<string, string> = {
-    apartment_fire_01: 'apartment_fire_01.json',
+  apartment_fire_01: 'apartment_fire_01.json',
+  blackout_resource_01: 'blackout_resource_01.json',
+  lost_hiking_01: 'lost_hiking_01.json',
+  basement_flood_01: 'basement_flood_01.json',
 };
 
 export async function loadScenarioV2(

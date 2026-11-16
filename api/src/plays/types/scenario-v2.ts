@@ -10,8 +10,30 @@ export interface ScenarioV2 {
    scenes: SceneV2[];
    endings: EndingV2[];
    timeEvents?: TimeEventV2[];
-  
+    timeline?: TimelineEventV2[];
 }
+
+
+export type TimelineEventV2 =
+  | {
+      eventId: string;
+      description: string;
+      atMinute: number;
+      when: ConditionV2[];
+      effects: EffectV2[];
+      after?: never;
+    }
+  | {
+      eventId: string;
+      description: string;
+      after: {
+        trigger: 'WHEN_BECOMES_TRUE';
+        delayMinutes: number;
+        when: ConditionV2[];
+      };
+      effects: EffectV2[];
+      atMinute?: never;
+    };
 
 
 
@@ -34,12 +56,20 @@ export type EndingV2 = {
 }
 
 
-export type SceneV2 = {
-    id : string;
-    description: string;
-    actions: ActionV2[];
 
-}
+export type NarrativeV2 = {
+  when: ConditionV2[];
+  text: string;
+};
+
+export type SceneV2 = {
+  id: string;
+  location?: string;
+  description?: string;
+  narratives?: NarrativeV2[];
+  actions: ActionV2[];
+};
+
 
 export type ActionV2 = {
     id: string;

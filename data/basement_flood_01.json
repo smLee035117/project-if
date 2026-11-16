@@ -1,0 +1,898 @@
+{
+  "schemaVersion": 2,
+  "schemaRevision": "2.0.0-rc2",
+  "scenarioId": "basement_flood_01",
+  "version": "0.3.0-content.3",
+  "title": "닫히는 출구",
+  "description": "폭우가 지하 1층 보행 통로로 밀려든다. 더 가까운 계단과 유입 방향에서 먼 계단 중 선택한다.",
+  "clock": {
+    "unit": "MINUTE",
+    "mode": "ACTION_DRIVEN",
+    "eventOrder": "AT_ACTION_END_BEFORE_OUTCOME",
+    "crossingPolicy": "APPLY_DURING_ACTION_RESOLVE_AT_END"
+  },
+  "initialSceneId": "D_JUNCTION",
+  "initialState": {
+    "world": {
+      "aOpen": true,
+      "bOpen": true,
+      "crew": false,
+      "accessLost": false
+    },
+    "player": {
+      "location": "B1_JUNCTION",
+      "initialCall": false,
+      "looked": false,
+      "bridgeTried": false,
+      "requested": false,
+      "lateRequest": false
+    },
+    "knowledge": {
+      "knownFacts": []
+    }
+  },
+  "scenes": [
+    {
+      "id": "D_JUNCTION",
+      "location": "B1_JUNCTION",
+      "narratives": [
+        {
+          "when": [],
+          "text": "폭우가 쏟아지는 밤, 상가 지하 1층 주차장과 보행 연결 통로의 교차점이다. 차량 경사로 배수구가 넘치고 바닥을 타고 빗물이 들어온다. 가까운 A 계단은 경사로 옆 통로, B 계단은 상가 뒤쪽 서비스 통로 끝이다. 양쪽 방화문 근처에는 각각 반 층 높은 설비 참으로 올라가는 짧은 연결 계단이 있다. 차량 경사로는 피난 경로가 아니다. 전화로 신고하더라도 서서 통화를 마칠지, 이동하며 위치만 짧게 알릴지 결정할 수 있다."
+        }
+      ],
+      "actions": [
+        {
+          "id": "D_TAKE_A",
+          "text": "가까운 A 계단 쪽 건조한 보행 통로로 향한다",
+          "when": [],
+          "durationMinutes": 2,
+          "outcomes": [
+            {
+              "when": [],
+              "resultText": "바닥의 흰 선을 따라 A 방화문 앞까지 도착했다. 문 아래 바닥은 여기까지 마른 상태다.",
+              "effects": [],
+              "transition": {
+                "type": "GOTO",
+                "sceneId": "D_A"
+              }
+            }
+          ]
+        },
+        {
+          "id": "D_CALL_WHILE_A",
+          "text": "건조한 A 통로로 이동하면서 119에 주소와 침수 위치를 짧게 알린다",
+          "when": [
+            {
+              "path": "player.initialCall",
+              "op": "EQ",
+              "value": false
+            }
+          ],
+          "durationMinutes": 2,
+          "outcomes": [
+            {
+              "when": [],
+              "resultText": "이동을 멈추지 않고 주소와 지하 1층 침수 상황을 짧게 전달한다. 상황요원은 안전한 계단을 우선 이용하고 위치가 달라지면 다시 알리라고 안내한다. A 방화문 앞에 도착했으며, 문 아래 바닥은 아직 마르다.",
+              "effects": [
+                {
+                  "type": "SET",
+                  "path": "player.initialCall",
+                  "value": true
+                },
+                {
+                  "type": "APPEND_UNIQUE",
+                  "path": "knowledge.knownFacts",
+                  "value": "ADDRESS_RELAYED"
+                }
+              ],
+              "transition": {
+                "type": "GOTO",
+                "sceneId": "D_A"
+              }
+            }
+          ]
+        },
+        {
+          "id": "D_TAKE_B",
+          "text": "경사로에서 멀어지는 상가 쪽 B 통로로 향한다",
+          "when": [],
+          "durationMinutes": 3,
+          "outcomes": [
+            {
+              "when": [],
+              "resultText": "서비스 통로를 지나 B 계단 방화문 앞에 닿는다. 지상 방향 표시등은 켜져 있다.",
+              "effects": [],
+              "transition": {
+                "type": "GOTO",
+                "sceneId": "D_B"
+              }
+            }
+          ]
+        },
+        {
+          "id": "D_START_CALL",
+          "text": "119에 건물 주소와 지하 1층 교차점 위치를 먼저 알린다",
+          "when": [
+            {
+              "path": "player.initialCall",
+              "op": "EQ",
+              "value": false
+            }
+          ],
+          "durationMinutes": 2,
+          "outcomes": [
+            {
+              "when": [],
+              "resultText": "주소와 유입 방향이 접수된다. 위치가 달라지면 다시 알리라는 답을 듣는다. 통화 중에도 바닥을 타고 물이 퍼지고 있으므로 지체 없이 대피 경로를 결정해야 한다.",
+              "effects": [
+                {
+                  "type": "SET",
+                  "path": "player.initialCall",
+                  "value": true
+                },
+                {
+                  "type": "APPEND_UNIQUE",
+                  "path": "knowledge.knownFacts",
+                  "value": "ADDRESS_RELAYED"
+                }
+              ],
+              "transition": {
+                "type": "STAY"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "D_A",
+      "location": "A_DOOR",
+      "narratives": [
+        {
+          "when": [],
+          "text": "A 방화문 앞. 위쪽은 지상 출구, 뒤쪽 짧은 통로 옆은 설비 계단참 연결 계단이다."
+        }
+      ],
+      "actions": [
+        {
+          "id": "D_A_UP",
+          "text": "A 계단에서 지상으로 올라간다",
+          "when": [],
+          "durationMinutes": 2,
+          "outcomes": [
+            {
+              "when": [
+                {
+                  "path": "world.aOpen",
+                  "op": "EQ",
+                  "value": false
+                }
+              ],
+              "resultText": "발을 올리기 전에 문 아래로 빗물이 밀려와 첫 단이 가려진다. 문턱을 넘지 않고 연결 계단으로 반 층 올라간다.",
+              "effects": [
+                {
+                  "type": "APPEND_UNIQUE",
+                  "path": "knowledge.knownFacts",
+                  "value": "A_BLOCKED"
+                }
+              ],
+              "transition": {
+                "type": "GOTO",
+                "sceneId": "D_HIGH"
+              }
+            },
+            {
+              "when": [
+                {
+                  "path": "world.aOpen",
+                  "op": "EQ",
+                  "value": true
+                }
+              ],
+              "resultText": "문을 지나 건조한 상부 계단을 오르고 지상 출구를 벗어난다.",
+              "effects": [],
+              "transition": {
+                "type": "GOTO",
+                "sceneId": "D_OUT"
+              }
+            }
+          ]
+        },
+        {
+          "id": "D_A_HIGH",
+          "text": "지척의 연결 계단으로 반 층 높은 참에 먼저 올라간다",
+          "when": [],
+          "durationMinutes": 1,
+          "outcomes": [
+            {
+              "when": [],
+              "resultText": "물을 건너지 않고 연결 계단을 올라와 두 통로 위쪽의 설비 참에 선다.",
+              "effects": [],
+              "transition": {
+                "type": "GOTO",
+                "sceneId": "D_HIGH"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "D_B",
+      "location": "B_DOOR",
+      "narratives": [
+        {
+          "when": [],
+          "text": "B 방화문 앞. 계단은 이곳부터 지상으로 이어진다. 문 옆 짧은 연결 계단은 설비 계단참으로 이어진다."
+        }
+      ],
+      "actions": [
+        {
+          "id": "D_B_UP",
+          "text": "B 계단에서 지상으로 올라간다",
+          "when": [],
+          "durationMinutes": 2,
+          "outcomes": [
+            {
+              "when": [
+                {
+                  "path": "world.bOpen",
+                  "op": "EQ",
+                  "value": false
+                }
+              ],
+              "resultText": "문을 열기 전 안쪽 계단으로 흐르는 물소리가 커지고 문 아래로 물이 튄다. 지상으로 뚫고 올라가지 않고 옆 연결 계단으로 물러난다.",
+              "effects": [
+                {
+                  "type": "APPEND_UNIQUE",
+                  "path": "knowledge.knownFacts",
+                  "value": "B_BLOCKED"
+                }
+              ],
+              "transition": {
+                "type": "GOTO",
+                "sceneId": "D_HIGH"
+              }
+            },
+            {
+              "when": [
+                {
+                  "path": "world.bOpen",
+                  "op": "EQ",
+                  "value": true
+                }
+              ],
+              "resultText": "건조한 계단을 따라 올라가자 상가 지상 출입구가 나온다. 빗물이 고인 길에서 물러나 높은 인도로 간다.",
+              "effects": [],
+              "transition": {
+                "type": "GOTO",
+                "sceneId": "D_OUT"
+              }
+            }
+          ]
+        },
+        {
+          "id": "D_B_HIGH",
+          "text": "문 앞에서 연결 계단을 이용해 높은 참으로 옮긴다",
+          "when": [],
+          "durationMinutes": 1,
+          "outcomes": [
+            {
+              "when": [],
+              "resultText": "통로보다 반 층 높은 참에 선다. 난간 너머 B 통로 일부가 보인다.",
+              "effects": [],
+              "transition": {
+                "type": "GOTO",
+                "sceneId": "D_HIGH"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "D_HIGH",
+      "location": "HIGH_LANDING",
+      "narratives": [
+        {
+          "when": [],
+          "text": "설비 계단참은 물이 먼저 모이는 B1 저지대보다 반 층 높고, 아래 통로와는 닫힌 방화문으로 구분된다. 외부로 이어지는 관리용 상부 출입구는 잠겨 있어 일반인이 직접 이용할 수 없다. 높은 참에서 B 방화문 쪽을 내려다볼 수 있다. 구조대와 통화할 때는 벽의 설비실 번호를 말할 수 있다."
+        }
+      ],
+      "actions": [
+        {
+          "id": "D_LOOK_B",
+          "text": "난간에서 B 방화문 앞 연결 구간을 다시 확인한다",
+          "when": [
+            {
+              "path": "player.looked",
+              "op": "EQ",
+              "value": false
+            }
+          ],
+          "durationMinutes": 1,
+          "outcomes": [
+            {
+              "when": [
+                {
+                  "path": "world.bOpen",
+                  "op": "EQ",
+                  "value": false
+                }
+              ],
+              "resultText": "B 앞의 낮은 부분이 이미 물에 가렸다. 여기서 내려가지 않고 현재 위치를 기억한다.",
+              "effects": [
+                {
+                  "type": "SET",
+                  "path": "player.looked",
+                  "value": true
+                },
+                {
+                  "type": "APPEND_UNIQUE",
+                  "path": "knowledge.knownFacts",
+                  "value": "B_BLOCKED"
+                }
+              ],
+              "transition": {
+                "type": "STAY"
+              }
+            },
+            {
+              "when": [
+                {
+                  "path": "world.bOpen",
+                  "op": "EQ",
+                  "value": true
+                }
+              ],
+              "resultText": "B 문까지 가는 높은 연결 구간이 아직 보인다. 다만 방화문 뒤와 그 다음 계단은 확인할 수 없다.",
+              "effects": [
+                {
+                  "type": "SET",
+                  "path": "player.looked",
+                  "value": true
+                },
+                {
+                  "type": "APPEND_UNIQUE",
+                  "path": "knowledge.knownFacts",
+                  "value": "B_VISIBLE"
+                }
+              ],
+              "transition": {
+                "type": "STAY"
+              }
+            }
+          ]
+        },
+        {
+          "id": "D_BRIDGE_B",
+          "text": "아까 확인한 높은 연결 구간을 따라 B 쪽을 시도한다",
+          "when": [
+            {
+              "path": "knowledge.knownFacts",
+              "op": "INCLUDES",
+              "value": "B_VISIBLE"
+            },
+            {
+              "path": "player.bridgeTried",
+              "op": "EQ",
+              "value": false
+            },
+            {
+              "path": "player.requested",
+              "op": "EQ",
+              "value": false
+            }
+          ],
+          "durationMinutes": 2,
+          "outcomes": [
+            {
+              "when": [
+                {
+                  "path": "world.bOpen",
+                  "op": "EQ",
+                  "value": false
+                }
+              ],
+              "resultText": "연결 구간 끝 문턱까지 물이 차는 것이 보인다. 참을 내려서기 전에 돌아선다.",
+              "effects": [
+                {
+                  "type": "SET",
+                  "path": "player.bridgeTried",
+                  "value": true
+                },
+                {
+                  "type": "APPEND_UNIQUE",
+                  "path": "knowledge.knownFacts",
+                  "value": "B_BLOCKED"
+                }
+              ],
+              "transition": {
+                "type": "STAY"
+              }
+            },
+            {
+              "when": [
+                {
+                  "path": "world.bOpen",
+                  "op": "EQ",
+                  "value": true
+                }
+              ],
+              "resultText": "연결 계단을 건너 B 문 앞 높은 부분에 도착한다.",
+              "effects": [
+                {
+                  "type": "SET",
+                  "path": "player.bridgeTried",
+                  "value": true
+                }
+              ],
+              "transition": {
+                "type": "GOTO",
+                "sceneId": "D_B"
+              }
+            }
+          ]
+        },
+        {
+          "id": "D_REQUEST",
+          "text": "119에 높은 참의 설비실 번호와 인원수를 알린다",
+          "when": [
+            {
+              "path": "player.requested",
+              "op": "EQ",
+              "value": false
+            }
+          ],
+          "durationMinutes": 1,
+          "outcomes": [
+            {
+              "when": [
+                {
+                  "path": "world.accessLost",
+                  "op": "EQ",
+                  "value": true
+                }
+              ],
+              "resultText": "설비 참에 한 명이라는 정보를 접수한다. 아래를 보니 두 통로 모두 물에 잠겼다. 그 상황까지 알리고 지금 위치를 지킨다.",
+              "effects": [
+                {
+                  "type": "SET",
+                  "path": "player.requested",
+                  "value": true
+                },
+                {
+                  "type": "SET",
+                  "path": "player.lateRequest",
+                  "value": true
+                },
+                {
+                  "type": "APPEND_UNIQUE",
+                  "path": "knowledge.knownFacts",
+                  "value": "LANDING_RELAYED"
+                },
+                {
+                  "type": "APPEND_UNIQUE",
+                  "path": "knowledge.knownFacts",
+                  "value": "NO_SELF_EXIT"
+                }
+              ],
+              "transition": {
+                "type": "STAY"
+              }
+            },
+            {
+              "when": [
+                {
+                  "path": "world.accessLost",
+                  "op": "EQ",
+                  "value": false
+                }
+              ],
+              "resultText": "설비 참에 한 명이라는 정보를 접수한다. 물이 있는 아래 통로로 내려가지 않고 현재 위치를 유지한다.",
+              "effects": [
+                {
+                  "type": "SET",
+                  "path": "player.requested",
+                  "value": true
+                },
+                {
+                  "type": "APPEND_UNIQUE",
+                  "path": "knowledge.knownFacts",
+                  "value": "LANDING_RELAYED"
+                }
+              ],
+              "transition": {
+                "type": "STAY"
+              }
+            }
+          ]
+        },
+        {
+          "id": "D_WAIT",
+          "text": "참을 벗어나지 않고 물소리와 바깥 소리를 살핀다",
+          "when": [],
+          "durationMinutes": 2,
+          "outcomes": [
+            {
+              "when": [
+                {
+                  "path": "world.crew",
+                  "op": "EQ",
+                  "value": true
+                }
+              ],
+              "resultText": "손전등이 움직이는 방향에서 설비실 번호가 들린다. 구조대가 위치를 확인했다.",
+              "effects": [
+                {
+                  "type": "APPEND_UNIQUE",
+                  "path": "knowledge.knownFacts",
+                  "value": "CREW_CONTACT"
+                }
+              ],
+              "transition": {
+                "type": "GOTO",
+                "sceneId": "D_CONTACT"
+              }
+            },
+            {
+              "when": [
+                {
+                  "path": "world.crew",
+                  "op": "EQ",
+                  "value": false
+                },
+                {
+                  "path": "world.accessLost",
+                  "op": "EQ",
+                  "value": true
+                },
+                {
+                  "path": "player.requested",
+                  "op": "EQ",
+                  "value": false
+                }
+              ],
+              "resultText": "난간 아래로 보이던 흰 보행선과 B 쪽 문턱이 물에 가렸다. 아직 이 참의 위치를 전달하지 못한 채 자력으로 나갈 길을 잃었다.",
+              "effects": [
+                {
+                  "type": "APPEND_UNIQUE",
+                  "path": "knowledge.knownFacts",
+                  "value": "NO_SELF_EXIT"
+                }
+              ],
+              "transition": {
+                "type": "GOTO",
+                "sceneId": "D_ISOLATED"
+              }
+            },
+            {
+              "when": [
+                {
+                  "path": "world.crew",
+                  "op": "EQ",
+                  "value": false
+                },
+                {
+                  "path": "player.requested",
+                  "op": "EQ",
+                  "value": true
+                }
+              ],
+              "resultText": "물이 차는 소리 뒤로 사람 목소리는 아직 들리지 않는다. 전달한 위치의 높은 참을 벗어나지 않는다.",
+              "effects": [],
+              "transition": {
+                "type": "STAY"
+              }
+            },
+            {
+              "when": [
+                {
+                  "path": "world.crew",
+                  "op": "EQ",
+                  "value": false
+                },
+                {
+                  "path": "world.accessLost",
+                  "op": "EQ",
+                  "value": false
+                },
+                {
+                  "path": "player.requested",
+                  "op": "EQ",
+                  "value": false
+                }
+              ],
+              "resultText": "물소리가 커진다. 이곳의 설비실 번호는 아직 밖에 알리지 않았다.",
+              "effects": [],
+              "transition": {
+                "type": "STAY"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "D_ISOLATED",
+      "location": "HIGH_LANDING",
+      "narratives": [
+        {
+          "when": [],
+          "text": "아래 통로를 모두 잃었다. 난간 아래로 내려갈 길은 없지만, 설비실 번호가 보이고 휴대전화도 연결된다."
+        }
+      ],
+      "actions": [
+        {
+          "id": "D_LATE_REQUEST",
+          "text": "119에 설비실 번호와 낮은 통로가 잠긴 사실을 전달한다",
+          "when": [],
+          "durationMinutes": 1,
+          "outcomes": [
+            {
+              "when": [],
+              "resultText": "설비실 번호와 인원수가 접수된다. 낮은 통로가 잠겼다는 말도 전달한다. 이곳을 벗어나지 않기로 한다.",
+              "effects": [
+                {
+                  "type": "SET",
+                  "path": "player.requested",
+                  "value": true
+                },
+                {
+                  "type": "SET",
+                  "path": "player.lateRequest",
+                  "value": true
+                },
+                {
+                  "type": "APPEND_UNIQUE",
+                  "path": "knowledge.knownFacts",
+                  "value": "LANDING_RELAYED"
+                }
+              ],
+              "transition": {
+                "type": "GOTO",
+                "sceneId": "D_HIGH"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "D_CONTACT",
+      "location": "HIGH_LANDING",
+      "narratives": [
+        {
+          "when": [],
+          "text": "지상 출입구 쪽 침수 신고로 이미 현장 가까이에 있던 구조대가 정확한 설비실 번호를 전달받았다. 구조대가 물이 찬 하부 통로 대신 관리자의 협조로 잠긴 상부 관리용 출입구를 확보해 접근했고 인계를 준비한다."
+        }
+      ],
+      "actions": [
+        {
+          "id": "D_ESCORT",
+          "text": "구조대의 안내에 따라 인계된다",
+          "when": [],
+          "durationMinutes": 2,
+          "outcomes": [
+            {
+              "when": [],
+              "resultText": "구조대의 안내에 따라 직원 통제 출입구 안쪽의 건조한 상부 계단으로 이동한다. 지상 통제선 밖에서 인원 확인을 받는다. 이 통로는 일반 이용자에게 미리 개방된 탈출로가 아니었다.",
+              "effects": [],
+              "transition": {
+                "type": "GOTO",
+                "sceneId": "D_RESCUED"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "D_RESCUED",
+      "location": "SAFE_GROUND",
+      "narratives": [
+        {
+          "when": [],
+          "text": "지상 통제선 밖이다. 구조대원이 어떤 통로가 보였는지 묻는다."
+        }
+      ],
+      "actions": [
+        {
+          "id": "D_RESCUE_END",
+          "text": "현장 인원 확인을 마친다",
+          "when": [],
+          "durationMinutes": 1,
+          "outcomes": [
+            {
+              "when": [
+                {
+                  "path": "player.lateRequest",
+                  "op": "EQ",
+                  "value": true
+                }
+              ],
+              "resultText": "두 통로가 모두 잠긴 뒤에야 정확한 위치를 알렸다고 설명한다. 구조대의 도움으로 지상에 도착했다.",
+              "effects": [],
+              "transition": {
+                "type": "END",
+                "endingId": "RESCUED_AFTER_ISOLATION"
+              }
+            },
+            {
+              "when": [
+                {
+                  "path": "player.lateRequest",
+                  "op": "EQ",
+                  "value": false
+                }
+              ],
+              "resultText": "높은 참의 위치와 닫힌 통로를 설명한다. 스스로 이용할 출구를 확보하지 못했지만 구조됐다.",
+              "effects": [],
+              "transition": {
+                "type": "END",
+                "endingId": "RESCUED"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "D_OUT",
+      "location": "SAFE_GROUND",
+      "narratives": [
+        {
+          "when": [],
+          "text": "지상 인도다. 출입구 쪽과 떨어져 소방대원이 통제선을 설치하는 것이 보인다."
+        }
+      ],
+      "actions": [
+        {
+          "id": "D_END",
+          "text": "지상에서 지하에 남아 있을 사람을 현장에 알린다",
+          "when": [],
+          "durationMinutes": 1,
+          "outcomes": [
+            {
+              "when": [],
+              "resultText": "마지막으로 본 지하 통로 쪽을 전달한다. 통제선 안으로 돌아가지 않고 피난을 마친다.",
+              "effects": [],
+              "transition": {
+                "type": "END",
+                "endingId": "SAFE_EXIT"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "timeline": [
+    {
+      "eventId": "D_A_CLOSE",
+      "atMinute": 5,
+      "description": "경사로 인접한 A의 접근 문턱이 먼저 폐쇄",
+      "when": [],
+      "effects": [
+        {
+          "type": "SET",
+          "path": "world.aOpen",
+          "value": false
+        }
+      ]
+    },
+    {
+      "eventId": "D_B_CLOSE",
+      "atMinute": 9,
+      "description": "상가 쪽 낮은 B 접근 구간까지 유입",
+      "when": [],
+      "effects": [
+        {
+          "type": "SET",
+          "path": "world.bOpen",
+          "value": false
+        }
+      ]
+    },
+    {
+      "eventId": "D_ACCESS_LOST",
+      "atMinute": 14,
+      "description": "높은 참 아래 보행 통로 전체가 잠겨 자력으로 돌아갈 길이 사라짐",
+      "when": [],
+      "effects": [
+        {
+          "type": "SET",
+          "path": "world.accessLost",
+          "value": true
+        }
+      ]
+    },
+    {
+      "eventId": "D_CREW_ARRIVES",
+      "after": {
+        "trigger": "WHEN_BECOMES_TRUE",
+        "delayMinutes": 7,
+        "when": [
+          {
+            "path": "player.requested",
+            "op": "EQ",
+            "value": true
+          }
+        ]
+      },
+      "description": "현장 인근에서 침수를 통제하던 구조 인력이 설비 참의 위치를 전달받고, 관리용 상부 출입구를 확보해 7분 후 접근하는 작품 설정",
+      "effects": [
+        {
+          "type": "SET",
+          "path": "world.crew",
+          "value": true
+        }
+      ]
+    }
+  ],
+  "endings": [
+    {
+      "id": "SAFE_EXIT",
+      "state": "CLEARED",
+      "title": "계단을 지나 지상으로",
+      "description": "열린 보행 계단으로 자력 탈출했다.",
+      "requirements": [
+        {
+          "path": "player.location",
+          "op": "EQ",
+          "value": "SAFE_GROUND"
+        }
+      ]
+    },
+    {
+      "id": "RESCUED",
+      "state": "CLEARED",
+      "title": "자력 탈출 실패, 구조 완료",
+      "description": "막힌 계단 대신 높은 참에서 위치를 전달하고 구조됐다.",
+      "requirements": [
+        {
+          "path": "player.location",
+          "op": "EQ",
+          "value": "SAFE_GROUND"
+        },
+        {
+          "path": "knowledge.knownFacts",
+          "op": "INCLUDES",
+          "value": "CREW_CONTACT"
+        }
+      ]
+    },
+    {
+      "id": "RESCUED_AFTER_ISOLATION",
+      "state": "CLEARED",
+      "title": "퇴로를 잃은 뒤 구조",
+      "description": "자력으로 나갈 길이 닫힌 뒤에도 설비실 번호를 전달해 구조됐다. 다음 대응은 남은 연락 수단으로 결정됐다.",
+      "requirements": [
+        {
+          "path": "world.accessLost",
+          "op": "EQ",
+          "value": true
+        },
+        {
+          "path": "player.lateRequest",
+          "op": "EQ",
+          "value": true
+        },
+        {
+          "path": "player.location",
+          "op": "EQ",
+          "value": "SAFE_GROUND"
+        },
+        {
+          "path": "knowledge.knownFacts",
+          "op": "INCLUDES",
+          "value": "CREW_CONTACT"
+        }
+      ]
+    }
+  ],
+  "sourceRefs": {
+    "MOIS_FLOOD": "https://www.safetv.go.kr/base/video/view?idx=2904&menuLevel=2&menuNo=29&searchCategory=177"
+  }
+}

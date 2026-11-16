@@ -15,7 +15,11 @@ export function createInitialPlayDataV2(
         scenarioVersion : scenario.version,
         version : 0,
         storyTimeMinutes : 0,
-        scenarioState: structuredClone(scenario.initialState)
+        scenarioState: structuredClone(scenario.initialState),
+        timelineProgress: {
+            pending: {},
+            processed: [],
+        },
     }
 
     

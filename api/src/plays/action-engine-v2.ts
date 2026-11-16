@@ -5,7 +5,7 @@ import type {
     ExecuteActionResultV2,
 } from './types/play-v2.js';
 
-import type { ScenarioV2, OutcomeV2, } from './types/scenario-v2.js';
+import type { ScenarioV2, OutcomeV2, TimeEventV2,} from './types/scenario-v2.js';
 
 
 
@@ -20,7 +20,7 @@ export {
     applyEffect,
 } from './state-engine-v2.js';
 
-import { advanceTimeV2 } from './time-engine-v2.js';
+import { advanceTimeV2 ,scheduleRelativeEventsV2, buildScheduledTimeEventsV2, completeHandledEventsV2  } from './time-engine-v2.js';
 
 
 
@@ -112,12 +112,22 @@ export function executeActionV2(
         throw new Error('행동 조건을 만족하지 않습니다.');
     }
 
+    
+    const scheduledEvents: TimeEventV2[] = buildScheduledTimeEventsV2(scenario.timeline??[],playData.timelineProgress);
+
+    
+
     const timeResult = advanceTimeV2(
         playData.scenarioState,
         playData.storyTimeMinutes,
         action.durationMinutes,
-        scenario.timeEvents ?? [],
-    )
+        [
+            ...(scenario.timeEvents ?? []),
+            ...scheduledEvents,
+        ],
+    );
+
+
 
 
     const outcome = selectOutcome(timeResult.scenarioState,action.outcomes);
@@ -141,21 +151,37 @@ export function executeActionV2(
 
      let nextPlayState: PlayDataV2['state'] = playData.state;
 
+    
     if (outcome.transition.type === 'GOTO') {
-        // 목적지 장면 검색
-        // 목적지가 존재하는지 검사
-        // 이동할 currentStageId 결정
         const nextSceneId = outcome.transition.sceneId;
 
         const nextScene = scenario.scenes.find(
             (scene) => scene.id === nextSceneId
         );
-        if(typeof nextScene === 'undefined') {
+
+        if (nextScene === undefined) {
             throw new Error('유효한 다음 장면 정보가 없습니다.');
         }
+
+        // 1. 변경 전에 모든 위치 정보 검증
+        if (nextScene.location !== undefined) {
+            if (
+                typeof nextScene.location !== 'string' ||
+                nextScene.location.trim().length === 0 ||
+                typeof nextScenarioState.player.location !== 'string'
+            ) {
+                throw new Error(
+                    '장면 이동에 필요한 위치 정보가 올바르지 않습니다.',
+                );
+            }
+        }
+
+        // 2. 검증 완료 후 상태 변경
         nextStageId = nextScene.id;
 
-
+        if (nextScene.location !== undefined) {
+            nextScenarioState.player.location = nextScene.location;
+        }
     } else if (outcome.transition.type === 'END') {
         //throw new Error('END는 아직 구현하지 않았습니다.');
 
