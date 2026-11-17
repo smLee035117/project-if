@@ -14,7 +14,7 @@ import {
 
 import { DatabaseService } from './database.service.js';
 import { createInitialPlayDataV2 } from '../plays/play-engine-v2.js';
-import { loadScenarioV2 } from '../plays/scenario-loader-v2.js';
+import { createV2TestScenario } from '../plays/test-fixtures/v2-test-scenario.js';
 
 import type { PlayDataV2 } from '../plays/types/play-v2.js';
 
@@ -44,7 +44,7 @@ function newPlayId(): string {
 }
 
 async function createFinishedPlay(): Promise<PlayDataV2> {
-    const scenario = await loadScenarioV2('apartment_fire_01');
+    const scenario = createV2TestScenario();
 
     const playData = createInitialPlayDataV2(
         scenario,
@@ -134,7 +134,7 @@ test('V2 종료 결과를 MySQL에 저장한다', async () => {
     expect(rows[0]).toMatchObject({
         result_state: 'CLEARED',
         ending_id: 'TEST_DONE',
-        scenario_version: '1.0.0',
+        scenario_version: playData.scenarioVersion,
         story_time_minutes: 1,
         play_version: 1,
     });

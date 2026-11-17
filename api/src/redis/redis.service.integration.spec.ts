@@ -7,7 +7,7 @@ import type { PlayData } from '../plays/types/play.js';
 import e from 'express';
 
 import { createInitialPlayDataV2 } from '../plays/play-engine-v2.js';
-import { loadScenarioV2 } from '../plays/scenario-loader-v2.js';
+import { createV2TestScenario } from '../plays/test-fixtures/v2-test-scenario.js';
 
 import { executeActionV2 } from '../plays/action-engine-v2.js';
 
@@ -327,7 +327,7 @@ test('GIVEN_UP 상태에서는 pending 결과를 생성하지 않는다', async 
         const playId = `test-${randomUUID()}`;
         playIds.push(playId);
 
-        const scenario = await loadScenarioV2('apartment_fire_01');
+        const scenario = createV2TestScenario();
 
         const initial = createInitialPlayDataV2(
             scenario,
@@ -355,7 +355,7 @@ test('GIVEN_UP 상태에서는 pending 결과를 생성하지 않는다', async 
         const playId = `test-${randomUUID()}`;
         playIds.push(playId);
 
-        const scenario = await loadScenarioV2('apartment_fire_01');
+        const scenario = createV2TestScenario();
         const initial = createInitialPlayDataV2(scenario, 4, 0);
 
         await service.savePlayV2(playId, initial);
@@ -378,7 +378,7 @@ test('GIVEN_UP 상태에서는 pending 결과를 생성하지 않는다', async 
       playIds.push(playId);
 
       const scenario =
-        await loadScenarioV2('apartment_fire_01');
+        createV2TestScenario();
 
       const initial =
         createInitialPlayDataV2(scenario, 4, 0);
@@ -408,7 +408,7 @@ test('GIVEN_UP 상태에서는 pending 결과를 생성하지 않는다', async 
       playIds.push(playId);
 
       const scenario =
-        await loadScenarioV2('apartment_fire_01');
+        createV2TestScenario();
 
       const initial =
         createInitialPlayDataV2(scenario, 4, 0);
@@ -442,7 +442,7 @@ test('GIVEN_UP 상태에서는 pending 결과를 생성하지 않는다', async 
       playIds.push(playId);
 
       const scenario =
-        await loadScenarioV2('apartment_fire_01');
+        createV2TestScenario();
 
       const initial =
         createInitialPlayDataV2(scenario, 4, 0);
@@ -478,7 +478,7 @@ test('GIVEN_UP 상태에서는 pending 결과를 생성하지 않는다', async 
 
 
     test('V2 종료 시 pending 결과가 함께 저장된다', async () => {
-      const scenario = await loadScenarioV2('apartment_fire_01');
+      const scenario = createV2TestScenario();
 
       for (const state of ['CLEARED', 'FAILED'] as const) {
           const playId = `test-${randomUUID()}`;
@@ -522,7 +522,7 @@ test('GIVEN_UP 상태에서는 pending 결과를 생성하지 않는다', async 
       const playId = `test-${randomUUID()}`;
       playIds.push(playId);
 
-      const scenario = await loadScenarioV2('apartment_fire_01');
+      const scenario = createV2TestScenario();
       const initial = createInitialPlayDataV2(scenario, 4, 0);
 
       const finished = {
@@ -552,7 +552,7 @@ test('GIVEN_UP 상태에서는 pending 결과를 생성하지 않는다', async 
       const playId = `test-${randomUUID()}`;
       playIds.push(playId);
 
-      const scenario = await loadScenarioV2('apartment_fire_01');
+      const scenario = createV2TestScenario();
       const initial = createInitialPlayDataV2(scenario, 4, 0);
 
       const resultA = {
@@ -593,7 +593,7 @@ test('GIVEN_UP 상태에서는 pending 결과를 생성하지 않는다', async 
       const playId = `test-${randomUUID()}`;
       playIds.push(playId);
 
-      const scenario = await loadScenarioV2('apartment_fire_01');
+      const scenario = createV2TestScenario();
       const initial = createInitialPlayDataV2(scenario, 4, 0);
 
       const next = executeActionV2(
@@ -619,7 +619,7 @@ test('GIVEN_UP 상태에서는 pending 결과를 생성하지 않는다', async 
       const playId = `test-${randomUUID()}`;
       playIds.push(playId);
 
-      const scenario = await loadScenarioV2('apartment_fire_01');
+      const scenario = createV2TestScenario();
       const initial = createInitialPlayDataV2(scenario, 4, 0);
 
       const givenUp = {

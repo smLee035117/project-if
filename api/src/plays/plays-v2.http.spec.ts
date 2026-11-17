@@ -24,6 +24,24 @@ import { DatabaseService } from '../database/database.service.js';
 import { RedisService } from '../redis/redis.service.js';
 
 import { loadScenarioV2 } from './scenario-loader-v2.js';
+
+// Keep HTTP contracts independent of frequently revised narrative JSON.
+vi.mock('./scenario-loader-v2.js', async (importOriginal) => {
+  const original = await importOriginal<typeof import('./scenario-loader-v2.js')>();
+
+  return {
+    ...original,
+    loadScenarioV2: async (scenarioId: string) => {
+      if (scenarioId === 'v2_test_01') {
+        const { createV2TestScenario } =
+          await import('./test-fixtures/v2-test-scenario.js');
+        return createV2TestScenario();
+      }
+      return original.loadScenarioV2(scenarioId);
+    },
+  };
+});
+
 import { createInitialPlayDataV2 } from './play-engine-v2.js';
 
 describe('Plays V2 HTTP', () => {
@@ -87,7 +105,7 @@ describe('Plays V2 HTTP', () => {
     const response = await request(app.getHttpServer())
       .post('/v2/plays')
       .send({
-        scenarioId: 'apartment_fire_01',
+        scenarioId: 'v2_test_01',
       });
 
     expect(response.status).toBe(201);
@@ -96,7 +114,7 @@ describe('Plays V2 HTTP', () => {
       .toEqual(expect.any(String));
 
     expect(response.body.view).toMatchObject({
-      scenarioId: 'apartment_fire_01',
+      scenarioId: 'v2_test_01',
       state: 'PLAYING',
       version: 0,
       currentSceneId: 'E01',
@@ -114,7 +132,7 @@ describe('Plays V2 HTTP', () => {
       .toHaveBeenCalledWith(
         response.body.playId,
         expect.objectContaining({
-          scenarioId: 'apartment_fire_01',
+          scenarioId: 'v2_test_01',
           userId: 4,
           version: 0,
         }),
@@ -131,7 +149,7 @@ describe('Plays V2 HTTP', () => {
 
   it('본인 플레이를 조회하면 공개 정보만 반환한다', async () => {
     const scenario =
-      await loadScenarioV2('apartment_fire_01');
+      await loadScenarioV2('v2_test_01');
 
     const playData =
       createInitialPlayDataV2(scenario, 4, 0);
@@ -172,7 +190,7 @@ describe('Plays V2 HTTP', () => {
 
   it('다른 사용자의 플레이 조회를 거부한다', async () => {
     const scenario =
-      await loadScenarioV2('apartment_fire_01');
+      await loadScenarioV2('v2_test_01');
 
     const playData =
       createInitialPlayDataV2(scenario, 4, 0);
@@ -235,7 +253,7 @@ describe('Plays V2 HTTP', () => {
 
 
   async function prepareOwnedV2Play() {
-    const scenario = await loadScenarioV2('apartment_fire_01');
+    const scenario = await loadScenarioV2('v2_test_01');
     const playData = createInitialPlayDataV2(scenario, 4, 0);
 
     databaseMock.findGuestUserId.mockResolvedValue(4);
