@@ -3,8 +3,8 @@
 - **문서 ID:** IF-IMPL-V2
 - **작성 기준일:** 2026-11-17
 - **기준 요구사항:** `PRODUCT_REQUIREMENTS_V2.md`
-- **코드 기준:** GitHub [`smLee035117/project-if`](https://github.com/smLee035117/project-if), `main` 파일 직접 확인
-- **주의:** 현재 브랜치의 코드 존재 여부를 검사했으며, 이 문서를 만들면서 로컬 Redis/MySQL 서버를 가동하거나 전체 테스트를 실행하지는 않았음. 테스트 완료를 새로 주장하지 않는다.
+- **코드 기준:** GitHub [`smLee035117/project-if`](https://github.com/smLee035117/project-if), `wip/f1-timeline-integration` 브랜치 (`62b27ac`) 파일 직접 확인
+- **주의:** 현재 작업 브랜치 소스를 확인했으며 이 문서를 만들면서 로컬 Redis/MySQL 및 Vitest를 재실행하지 않았음. 사용자 제공 실행 로그상 2026-11-17 전체 테스트 165/165 통과·빌드 성공. 상세한 콘텐츠 탐색은 `V2_SCENARIO_COMPATIBILITY_AUDIT.md` 참조.
 
 ## 1. 상태 정의
 
@@ -22,7 +22,7 @@
 
 | ID | 요구 기능 | 상태 | 코드 근거 | 확인된 미완료/차이 | 우선 |
 |---|---|---|---|---|---|
-| F01-01 | 시나리오 목록·선택 | **미구현 확인** | `plays-v2.controller.ts`, `scenario-loader-v2.ts` | 목록 API 없음. V2 Loader가 `apartment_fire_01` 한 종만 등록 | P0 |
+| F01-01 | 시나리오 목록·선택 | **부분 구현** | `scenario-loader-v2.ts`, `plays-v2.controller.ts` | 로더에는 4종 등록. 공개 시나리오 목록 조회 API/화면은 아직 없음 | P0 |
 | F01-02 | 첫 화면에 장면·행동 표시 | **부분 구현** | `startPlayV2`, `buildPlayViewV2` | API의 공개 View는 구성되지만 실제 웹 시작·선택 화면 없음 | P0 |
 | F02-01 | 게스트 토큰 생성·확인 | **구현 확인** | `guest/guest-token.ts`, `getOrCreateGuest()`, `DatabaseService` | 쿠키 설정 및 DB 조회 경로 있음; 배포 보안 재검토 필요 | P1 |
 | F02-02 | 게스트 7일 / 성공 행동 후 TTL 1시간 | **부분 구현** | `plays-v2.controller.ts`, `plays.controller.ts`, `database.service.ts`, `redis.service.ts` | Redis 3600초 및 성공 CAS 연장은 일치. 쿠키·MySQL 세션 **30일 → 7일** 변경 및 만료 테스트 필요 | P1 |
@@ -35,38 +35,37 @@
 | F04-02 | 행동 가능 조건 | **구현 확인** | `buildPlayViewV2()`, `submitActionV2()`, `state-engine-v2.ts` | `available` 반환과 실행 전 검사 있음. 불가능 사유 노출 정책은 미정 | P0 |
 | F04-03 | 결과별 분기/정확히 하나 선택 | **구현 확인** | `selectOutcome()`, `executeActionV2()` | 매칭 0/복수는 오류. 실제 4종 분기와 일치 테스트 필요 | P0 |
 | F04-04 | SET/ADD/지식 효과 | **부분 구현** | `types/scenario-v2.ts`, `state-engine-v2.ts`, `scenario-validator-v2.ts` | 네 효과 존재. RC2의 `ADD` 적용 결과 음수 허용 범위 등 세부 불변식 검증 필요 | P0 |
-| F04-05 | GOTO 시 위치 자동 일치 | **미구현 확인** | `action-engine-v2.ts`, `types/scenario-v2.ts` | 현재 GOTO는 `currentStageId`만 갱신. `SceneV2`에 `location` 없음 | P0 |
+| F04-05 | GOTO 시 위치 자동 일치 | **구현 확인** | `action-engine-v2.ts`, `types/scenario-v2.ts` | `GOTO` 목표 장면의 `location`을 `player.location`에 반영함. 4종 실제 경로 연동 테스트 추가 필요 | P0 |
 | F04-06 | 행동에 따른 가상 시계 | **구현 확인** | `time-engine-v2.ts`, `executeActionV2()` | `storyTimeMinutes` 전진 및 검증. 장기 이동/중단 경계는 콘텐츠 계약 준수 확인 | P0 |
-| F04-07 | 절대·상대 시간 이벤트 | **부분 구현** | `time-engine-v2.ts`, `types/scenario-v2.ts` | `timeEvents[].atMinute`는 처리. 상대 조건 예약, 이벤트 ID 이력, 일회성 예약/적용은 미구현 | P0 |
+| F04-07 | 절대·상대 시간 이벤트 | **부분 구현·차단 이슈** | `time-engine-v2.ts`, `action-engine-v2.ts`, `PlayDataV2.timelineProgress` | 상대 이벤트 예약/완료 함수와 타입은 있으나 **실제 `executeActionV2`에서 호출되지 않음**. 조난·침수 구조 엔딩 및 화재 Z 피난 경로 영향 | P0 |
 | F04-08 | world/player/knowledge 분리·비공개 | **구현 확인** | `types/play-v2.ts`, `play-view-builder-v2.ts` | 응답에 원시 world 미포함. 상태 조건이 숨은 정보 노출을 만들지 않는지 콘텐츠 테스트 필요 | P0 |
-| F04-09 | JSON 구조·참조 검증 | **부분 구현** | `scenario-loader-v2.ts`, `scenario-validator-v2.ts` | 현행 V2 구조 검증 존재. RC2.1의 `narratives`, `location`, `timeline`, `initialVariants` 등 계약 미반영 | P0 |
+| F04-09 | JSON 구조·참조 검증 | **부분 구현** | `scenario-loader-v2.ts`, `scenario-validator-v2.ts` | 4종 로더 등록, `location`/`narratives`/`timeline` 구조 검증 존재. `initialVariants`/루트 메타데이터 검증과 조건 결과의 동적 도달성 검증 미흡 | P0 |
 | F05-01 | 엔딩 조건·결과 | **구현 확인** | `executeActionV2()`, `savePlayResultV2()` | END 조건 검사, CLEARED/FAILED 기록. 실제 콘텐츠 완결 경로는 별도 | P0 |
-| F05-02 | 플레이 교착 방지 | **추가 검증** | `data/apartment_fire_01.json`, `scenario-validator-v2.ts` | 테스트 JSON은 신고 후 STAY만 가능, END 행동 없음. 시나리오 도달성/루프 검증 부족 | P0 |
+| F05-02 | 플레이 교착 방지 | **추가 검증·차단 이슈** | 4종 JSON, `selectOutcome()` | 모든 장면에 행동·정적 GOTO 연결은 있지만, 가상 Z 세계선 `F_REFUGE_WAIT`에서 상대 이벤트 누락 시 outcome 0개로 예외 가능. 전체 경로 탐색 및 회귀 테스트 필요 | P0 |
 | F05-03 | 행동 직후 메시지 | **부분 구현** | `submitActionV2()` → `resultText` + `view` | API 결과 존재. 프런트엔드 표시/정보 공개 검증 미구현 | P0 |
-| F05-04 | 엔딩 크레딧·행동별 회고·근거 | **부분 구현** | `play-view-builder-v2.ts`, `plays-v2.controller.ts` | 엔딩 제목·설명은 반환. 전체 행동 이력·중요 판단·근거·출처·웹 UI 미구현 | P0 |
+| F05-04 | 엔딩 크레딧·행동별 회고·근거 | **부분 구현** | `play-view-builder-v2.ts`, 4종 JSON `sourceRefs` | 엔딩 제목/설명은 응답. 출처 맵은 JSON에 있으나 개별 행동·outcome의 리뷰/근거 연결, 행동 이력, UI는 미구현 | P0 |
 | F05-05 | 리뷰용 행동 이력과 종료 후 영속화 | **미구현 확인** | `types/play-v2.ts`, `action-engine-v2.ts`, `database.service.ts` | 행동 배열/결과 스냅샷·CAS 반영·MySQL 이력 저장·리뷰 조회 없음 | P0 |
 | F06-01 | Redis CAS 동시성 | **구현 확인** | `RedisService.updatePlayV2IfVersion()` | 버전 비교·검사·저장, 종료 시 pending 원자 기록. 스케일 테스트는 별도 | P0 |
 | F06-02 | requestId 멱등 응답 | **미구현 확인** | `SubmitActionV2Dto`, `submitActionV2()`, Redis CAS | 현재 요청은 actionId+expectedVersion만 받음. 같은 요청 재전송 시 성공 응답 재사용 불가 | P1 |
 | F06-03 | 완료 결과+행동 이력 멱등 저장 | **부분 구현** | `DatabaseService.savePlayResultV2()` | 결과 메타데이터 중복 저장 비교는 구현. 행동 이력 타입·DB 보관·복구 시 동일성 검증 미구현 | P0 |
 | F06-04 | Redis pending·자동 복구 | **구현 확인** | `RedisService`, `recoverPendingPlayResultsV2()`, `PlayRecoveryBootstrapService` | 시작 시 복구+60초 반복. 다중 인스턴스 동시 복구·Redis 자체 유실 위험은 별도 | P0 |
-| F07-01 | 4종 공통 JSON 연동 | **미구현 확인** | `scenario-loader-v2.ts`, `data/apartment_fire_01.json` | 메인에는 1장면 테스트 화재만 등록. Content.3 4종은 독립 파일·아직 연동되지 않음 | P0 |
-| F07-02 | 버전 고정·초기 세계선 | **부분 구현** | `PlayDataV2.scenarioVersion`, `action-engine-v2.ts` | 버전 비교 존재, 구 버전의 파일 조회/보관 정책 없음; `initialVariants` 미지원 | P0 |
-| F07-03 | 4종 구조 검토·화재 1종 우선 공개 | **미구현/추가 검증** | `scenario-loader-v2.ts`, `data/apartment_fire_01.json` | 4종 공통 요구사항 대조·스키마 동결 미완. 최초 공개의 완결 대상은 화재 1종이며 나머지 3종 통합은 후속 | P0 |
+| F07-01 | 4종 공통 JSON 연동 | **부분 구현·추가 검증** | `scenario-loader-v2.ts`, `data/*.json` | **화재·정전·조난·침수 4종 모두 등록** 및 RC2.1 JSON 존재. 실제 4종 분기·종료를 TS 엔진/HTTP에서 검증할 필요 | P0 |
+| F07-02 | 버전 고정·초기 세계선 | **부분 구현·차단 이슈** | `PlayDataV2.scenarioVersion`, `createInitialPlayDataV2()`, 화재 `initialVariants` | 시작 시 화재 X만 사용, Y/Z 미적용. 기존 플레이 버전에 대응하는 옛 JSON 조회도 불가 | P0 |
+| F07-03 | 4종 구조 검토·화재 1종 우선 공개 | **부분 구현·추가 검증** | 4종 RC2.1 JSON, V2 엔진 | 화재 JSON 14장면·28행동·6엔딩, 나머지 3종도 저장소에 존재. 실제 엔딩 경로 및 상대 이벤트 연동 후 스키마 동결 가능 | P0 |
 | F08-01 | 웹 화면과 API 연결 | **미구현 확인** | `plays-v2.controller.ts`, README | 첫 화면/행동 결과·이어하기·새로 시작·포기·엔딩 크레딧·만료 안내 UI 없음 | P0 |
-| F08-02 | Docker·CI·재현 가능한 테스트 | **부분 구현** | 기존 `*.spec.ts`, `README.md` | Vitest 테스트 코드/실행 안내 있음. Docker/CI 완성·최신 전체 테스트 실행은 재확인 필요 | P1 |
+| F08-02 | Docker·CI·재현 가능한 테스트 | **부분 구현** | Vitest `*.spec.ts`, 사용자 제공 테스트·빌드 로그 | 2026-11-17 사용자 로컬에서 20파일/165테스트 통과·Nest 빌드 성공. Docker·CI·새 환경 초기화 확인은 남음 | P1 |
 | F08-03 | 공개 배포·운영 로그·헬스 체크 | **미구현/추가 검증** | `README.md`, `main.ts` | 배포, 운영 추적 로그, 정식 헬스 체크·롤백 등 완료 근거 확인되지 않음 | P1 |
 
 > **상태 판독 주의:** F04-03이나 F05-01의 '구현 확인'은 엔진이 해당 종류의 처리를 지원한다는 뜻이다. 이를 이용한 **실제 4종 시나리오의 정상 종료**는 F07-03에서 별도 완료 판정한다.
 
-## 3. 확정 정책과 현재 코드의 차이 요약
+## 3. 확정 정책과 현재 코드의 차이 요약 (작업 브랜치 기준)
 
-**구현과 정책을 혼동하면 안 되는 핵심 차이:**
-
-- **D-01:** 현재 V1·V2 쿠키 및 MySQL 게스트 세션은 30일이며, 확정된 7일로 바꾸어야 합니다.
-- **D-02·D-05:** Redis `EX 3600`/CAS 행동 갱신·만료 후 404는 확정 정책과 현재 동작이 부합합니다.
-- **D-03·D-04:** 시작마다 새 플레이 생성, V2 포기 API 없음. 단일 이어하기는 클라이언트의 버튼만으로 보장할 수 없으며 서버 활성 슬롯 관리가 필요합니다.
-- **D-06·D-07·D-10:** V2 엔딩/결과 반환은 있지만 행동별 리뷰, MySQL 행동 이력, V1 점수 필드와 분리는 미완료입니다.
-- **D-08·D-09:** V2의 화재 JSON은 단일 장면 시험용입니다. 네 콘텐츠의 구조적 요구사항을 확인해야 하며 최초 공개는 완결된 화재 1종입니다.
+- **D-01:** V1/V2 쿠키와 MySQL 세션은 여전히 30일 → 확정된 7일로 수정 필요.
+- **D-02·D-05:** Redis 3600초 TTL, 성공 CAS 시 갱신 및 만료 후 404는 현재 정책에 부합.
+- **D-03·D-04:** 게스트 단일 이어하기, 이전 플레이 접근 차단, V2 포기 API는 미구현.
+- **D-06·D-07·D-10:** V2 엔딩 판정은 구현. 행동별 이력·리뷰와 MySQL 이력 저장은 미구현. V2 타입은 아직 V1 점수형 PlayData를 상속.
+- **D-08·D-09:** 4종 JSON과 정적 공통 구조는 저장소에 존재. **상대 타임라인 미연결, 화재 세계선 미적용, 실제 4종 엔딩 통합 테스트 부족**으로 스키마 동결 보류.
+- **README:** 일부 현재 콘텐츠 현황·링크가 구 브랜치 기준으로 작성되어 갱신 필요.
 
 ## 4. 최신 GitHub 코드에서 확인한 중요한 세부 사실
 
@@ -95,18 +94,22 @@
 - `PlayRecoveryBootstrapService`는 테스트 환경에서 비활성, 그 밖에는 부팅 시 1회 및 이후 60초 간격으로 V1/V2 pending 복구를 시도한다. **한 인스턴스 안에서만** 동시 복구 실행을 막는다.
 - Redis의 영속화 설정이나 다중 인스턴스 분산 락까지 보장되는 것은 아니다.
 
-### 4.4 콘텐츠 계약과 현재 실행 코드 간 주요 차이
+### 4.4 콘텐츠 계약과 현재 실행 코드 간 주요 차이 (블록 A 최신 감사)
 
-| RC2/RC2.1 계약 후보 | 현재 구현 | 결과 |
+| RC2/RC2.1 요구 | 현재 작업 브랜치의 구현 | 판정 |
 |---|---|---|
-| `scenes[].location`, 조건별 `narratives[]` | `SceneV2{id,description,actions}` | 동적 장면 텍스트와 이동 위치 갱신 미지원 |
-| `initialVariants` (화재 X/Y/Z 등) | `initialState`만 복제 | 시작 시 세계선 선택 기능 미지원 |
-| 절대/상대 `timeline` 및 사용/예약 이력 | `timeEvents[].atMinute` | 상대 예약/ID 이력·일회성 동작 미지원 |
-| `clock.mode=ACTION_DRIVEN` | `durationMinutes`로 시간 진행 | 핵심 방향 일치. 세부 스키마는 미반영 |
-| `requestId` 기반 멱등 결과 재사용 | 버전 CAS만 | 중복 반영 방지와 동일 응답 재사용을 구분해야 함 |
-| `GOTO` 시 `player.location` 자동 이동 | `currentStageId`만 변경 | 장면과 실제 위치가 엇갈릴 수 있음 |
-| `ADD` 결과 값의 허용 범위 | 자료형·finite 검사, 연산 결과 finite 검사 | 음수 자체를 금지하면 안 됨; 결과 하한 정책 점검 필요 |
-| 콘텐츠 sourceRefs와 종료 후 해설 | `resultText`, 기본 `ending` | 출처/리뷰 데이터 처리·UI 추가 필요 |
+| 4종 JSON 로더 | 화재·정전·조난·침수 모두 등록 | **등록 확인**, 실제 종료 검증 필요 |
+| `scenes[].location`, 조건별 `narratives` | 타입·검증·공개 View에 구현, `GOTO` 위치 동기화 | **구현 확인**, 실제 콘텐츠는 대부분 단일 서술 |
+| 화재 `initialVariants` X/Y/Z | 타입·검증·초기화 적용 없음. X만 기본 실행 | **미구현** |
+| 절대 시각 `timeline` | 시간 경계 처리 | **구현 확인** |
+| 상대 예약 `timeline.after` | helper 존재, `executeActionV2` 호출·progress 반영 없음 | **차단 이슈** |
+| `clock.mode=ACTION_DRIVEN` | 행동 소요시간 기반. 루트 메타데이터 검증은 없음 | **동작 방향 일치**, 계약 검증 보완 |
+| `requestId` 멱등 응답 | 버전 CAS만 | **미구현** |
+| 종료 후 리뷰·출처 | 결과 메시지와 루트 `sourceRefs` 존재 | **개별 outcome·출처 연결 및 이력 저장 미구현** |
+| 콘텐츠 버전 유지 | `scenarioVersion` 비교, 로더는 최신 JSON만 | **릴리스 시 구 버전 진행 중단 위험** |
+| `ADD` 결과 값 | 음수 델타를 허용하고 유한성 검증 | **방향 적합**, 자원 하한 경로 검증 필요 |
+
+상세 근거와 시나리오별 경로 모사는 [4종 호환성 감사](./V2_SCENARIO_COMPATIBILITY_AUDIT.md) 참고.
 
 ## 5. 우선 구현·검증 순서 (정책 확정 이후)
 
@@ -122,11 +125,11 @@
 
 ### B. 공통 스키마·화재 1종 수직 통합 (P0)
 
-1. [ ] **4종 RC2.1 구조 요구사항 먼저 대조:** `location`, `narratives`, `initialVariants`, 절대·상대 시간 사건, 버전 관리 등이 공통 엔진에서 필요한지 확인
-2. [ ] 필수 구조 누락을 타입·검증·엔진에서 보완하고 `GOTO` 위치 연동/효과 불변식 테스트
-3. [ ] 상대 시간 예약·발생 이력/중복 방지 등 실제 콘텐츠에 필요한 시간 규칙 검증
-4. [ ] 화재 시나리오 실제 JSON으로 시작→분기→성공·실패 엔딩·Redis/MySQL까지 통합 테스트
-5. [ ] 정전·조난·침수의 스키마 적합성 검증 후 **동결**. 3종 완성·공개는 이후 단계
+1. [x] **4종 RC2.1 정적 구조 대조(블록 A):** 4종 로더·참조·필드 경로 확인, 상대 시간 미연결/초기 세계선 누락 식별. **실제 TS 동작 테스트는 미완**
+2. [ ] 상대 시간 이벤트 예약·완료를 실제 `executeActionV2`의 `timelineProgress`에 연결하고 회귀 테스트
+3. [ ] 화재 X/Y/Z 선택·검증 및 버전 처리 정책 확정, 자원 효과 불변식 점검
+4. [ ] 실제 화재 JSON으로 X/Y/Z 대표 경로→6개 엔딩→Redis/MySQL 통합 테스트; 결과/서술이 정확히 하나 매칭되는지 검증
+5. [ ] 정전·조난·침수의 실제 엔딩 경로를 점검하고 리뷰용 결과 식별·출처 연결 확장 방침을 정한 후 **동결**. 3종 완성·공개는 이후 단계
 
 ### C. 게스트 흐름·행동 이력·공개 화면 (P0/P1)
 
@@ -164,19 +167,19 @@
 
 ## 7. 코드 확인용 경로
 
-- [PlaysV2Controller](https://github.com/smLee035117/project-if/blob/main/api/src/plays/plays-v2.controller.ts)
-- [PlaysService](https://github.com/smLee035117/project-if/blob/main/api/src/plays/plays.service.ts)
-- [ScenarioV2 타입](https://github.com/smLee035117/project-if/blob/main/api/src/plays/types/scenario-v2.ts)
-- [ScenarioV2 Loader](https://github.com/smLee035117/project-if/blob/main/api/src/plays/scenario-loader-v2.ts)
-- [ScenarioV2 Validator](https://github.com/smLee035117/project-if/blob/main/api/src/plays/scenario-validator-v2.ts)
-- [Action Engine](https://github.com/smLee035117/project-if/blob/main/api/src/plays/action-engine-v2.ts)
-- [State Engine](https://github.com/smLee035117/project-if/blob/main/api/src/plays/state-engine-v2.ts)
-- [Time Engine](https://github.com/smLee035117/project-if/blob/main/api/src/plays/time-engine-v2.ts)
-- [View Builder](https://github.com/smLee035117/project-if/blob/main/api/src/plays/play-view-builder-v2.ts)
-- [RedisService](https://github.com/smLee035117/project-if/blob/main/api/src/redis/redis.service.ts)
-- [DatabaseService](https://github.com/smLee035117/project-if/blob/main/api/src/database/database.service.ts)
-- [Recovery Bootstrap](https://github.com/smLee035117/project-if/blob/main/api/src/plays/play-recovery-bootstrap.service.ts)
-- [메인 브랜치 화재 테스트 JSON](https://github.com/smLee035117/project-if/blob/main/data/apartment_fire_01.json)
+- [PlaysV2Controller](https://github.com/smLee035117/project-if/blob/wip/f1-timeline-integration/api/src/plays/plays-v2.controller.ts)
+- [PlaysService](https://github.com/smLee035117/project-if/blob/wip/f1-timeline-integration/api/src/plays/plays.service.ts)
+- [ScenarioV2 타입](https://github.com/smLee035117/project-if/blob/wip/f1-timeline-integration/api/src/plays/types/scenario-v2.ts)
+- [ScenarioV2 Loader](https://github.com/smLee035117/project-if/blob/wip/f1-timeline-integration/api/src/plays/scenario-loader-v2.ts)
+- [ScenarioV2 Validator](https://github.com/smLee035117/project-if/blob/wip/f1-timeline-integration/api/src/plays/scenario-validator-v2.ts)
+- [Action Engine](https://github.com/smLee035117/project-if/blob/wip/f1-timeline-integration/api/src/plays/action-engine-v2.ts)
+- [State Engine](https://github.com/smLee035117/project-if/blob/wip/f1-timeline-integration/api/src/plays/state-engine-v2.ts)
+- [Time Engine](https://github.com/smLee035117/project-if/blob/wip/f1-timeline-integration/api/src/plays/time-engine-v2.ts)
+- [View Builder](https://github.com/smLee035117/project-if/blob/wip/f1-timeline-integration/api/src/plays/play-view-builder-v2.ts)
+- [RedisService](https://github.com/smLee035117/project-if/blob/wip/f1-timeline-integration/api/src/redis/redis.service.ts)
+- [DatabaseService](https://github.com/smLee035117/project-if/blob/wip/f1-timeline-integration/api/src/database/database.service.ts)
+- [Recovery Bootstrap](https://github.com/smLee035117/project-if/blob/wip/f1-timeline-integration/api/src/plays/play-recovery-bootstrap.service.ts)
+- [작업 브랜치 화재 RC2.1 JSON](https://github.com/smLee035117/project-if/blob/wip/f1-timeline-integration/data/apartment_fire_01.json)
 
 ## 8. 업데이트 규칙
 
