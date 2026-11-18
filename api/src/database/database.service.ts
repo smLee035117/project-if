@@ -7,6 +7,8 @@ import type { PlayData } from '../plays/types/play.js';
 
 import type { PlayDataV2 } from '../plays/types/play-v2.js';
 
+import { isDeepStrictEqual } from 'node:util';
+
 interface GuestSessionRow extends RowDataPacket {
   user_no: number;
 }
@@ -27,6 +29,7 @@ interface PlayResultV2Row extends RowDataPacket {
     ending_id: string;
     story_time_minutes: number;
     play_version: number;
+    action_history: unknown;
 }
 
 
@@ -217,6 +220,10 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy  {
             throw new Error('V2 플레이 버전이 올바르지 않습니다.');
         }
 
+        const actionHistoryJson = JSON.stringify(
+            playData.actionHistory ?? [],
+        );
+
         const sql = `
             INSERT INTO user_play_log_v2 (
                 play_id,
@@ -227,9 +234,10 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy  {
                 ending_id,
                 story_time_minutes,
                 play_version,
+                action_history,
                 finished_at
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, UTC_TIMESTAMP(6))
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, UTC_TIMESTAMP(6))
         `;
 
         try {
@@ -242,6 +250,7 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy  {
                 playData.endingId,
                 playData.storyTimeMinutes,
                 playData.version,
+                actionHistoryJson,
             ]);
         } catch (error: unknown) {
             const isDuplicate =
@@ -262,7 +271,8 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy  {
                         result_state,
                         ending_id,
                         story_time_minutes,
-                        play_version
+                        play_version,
+                        action_history
                     FROM user_play_log_v2
                     WHERE play_id = ?`,
                     [playId],
@@ -276,6 +286,18 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy  {
                 );
             }
 
+            // MySQL JSON 반환값은 드라이버 설정에 따라
+            // 객체 또는 문자열일 수 있습니다.
+            const savedHistory =
+                typeof existing.action_history === 'string'
+                    ? JSON.parse(existing.action_history)
+                    : (existing.action_history ?? []);
+
+            const isSameHistory = isDeepStrictEqual(
+                savedHistory,
+                playData.actionHistory ?? [],
+            );
+
             const isSameResult =
                 existing.user_no === playData.userId &&
                 existing.scenario_id === playData.scenarioId &&
@@ -284,7 +306,8 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy  {
                 existing.ending_id === playData.endingId &&
                 existing.story_time_minutes ===
                     playData.storyTimeMinutes &&
-                existing.play_version === playData.version;
+                existing.play_version === playData.version &&
+                isSameHistory;
 
             if (isSameResult) {
                 return;

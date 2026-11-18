@@ -1,5 +1,8 @@
 
-import type { PlayDataV2 } from './play-v2.js';
+import type {
+    PlayDataV2,
+    ActionHistoryEntryV2,
+} from './play-v2.js';
 
 export type PlayActionViewV2 = {
     id: string;
@@ -19,6 +22,9 @@ export type PlayViewV2 = {
 
     knownFacts: string[];
     actions: PlayActionViewV2[];
+
+    // 종료 이후에만 공개합니다.
+    actionHistory?: ActionHistoryEntryV2[];
 
     ending?: {
         id: string;

@@ -12,6 +12,17 @@ export interface ScenarioState {
     };
 }
 
+export interface ActionHistoryEntryV2 {
+    sequence: number;
+    fromSceneId: string;
+    toSceneId: string;
+    actionId: string;
+    actionText: string;
+    resultText: string;
+    startedAtMinute: number;
+    endedAtMinute: number;
+}
+
 export interface PlayDataV2 extends PlayData {
     currentStageId: string;
     version: number;
@@ -20,6 +31,9 @@ export interface PlayDataV2 extends PlayData {
     scenarioState: ScenarioState;
     endingId?: string;
     timelineProgress: TimelineProgressV2;
+
+    // 기존 Redis 플레이에는 이 필드가 없을 수 있습니다.
+    actionHistory?: ActionHistoryEntryV2[];
 }
 
 

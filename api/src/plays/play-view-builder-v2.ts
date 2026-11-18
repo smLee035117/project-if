@@ -90,7 +90,14 @@ export function buildPlayViewV2(
         storyTimeMinutes: playData.storyTimeMinutes,
         knownFacts: [...playData.scenarioState.knowledge.knownFacts],
         actions,
-        ...(ending ? { ending } : {}),
+        ...(ending
+            ? {
+                ending,
+                actionHistory: (playData.actionHistory ?? []).map(
+                    (entry) => ({ ...entry }),
+                ),
+              }
+            : {}),
     };
 }
 
