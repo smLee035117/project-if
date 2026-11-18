@@ -2,7 +2,7 @@
   "schemaVersion": 2,
   "schemaRevision": "2.0.0-rc2",
   "scenarioId": "apartment_fire_01",
-  "version": "1.3.0-content.3",
+  "version": "1.3.0-content.4",
   "title": "경보가 울린 밤",
   "description": "13층 세대에서 경보를 듣는다. 현관 밖과 내 집의 상태를 따로 판단해야 한다.",
   "clock": {
@@ -390,7 +390,23 @@
       "location": "HOME_LIVING",
       "narratives": [
         {
-          "when": [],
+          "when": [
+            {
+              "path": "world.clear",
+              "op": "EQ",
+              "value": true
+            }
+          ],
+          "text": "현장 안내 방송이 반복된다. 13층 해당 세대는 안전 확인을 마쳤지만 계단 이용은 별도 지시를 따라야 한다. 현관은 닫혀 있고 거실에는 눈에 보이는 연기가 없다."
+        },
+        {
+          "when": [
+            {
+              "path": "world.clear",
+              "op": "EQ",
+              "value": false
+            }
+          ],
           "text": "현관은 닫혀 있다. 홀에서 들리던 발소리가 멎고 스피커 잡음만 남았다."
         }
       ],
@@ -684,7 +700,43 @@
                   "value": false
                 },
                 {
+                  "path": "world.clear",
+                  "op": "EQ",
+                  "value": true
+                }
+              ],
+              "resultText": "현관 주변을 다시 살피는 사이 현장 안내가 들린다. 13층 해당 세대의 안전 확인이 끝났으며, 계단으로 내려가라는 별도 지시는 없다. 현관을 닫고 실내 대기를 마친다.",
+              "effects": [
+                {
+                  "type": "SET",
+                  "path": "player.clearHeard",
+                  "value": true
+                },
+                {
+                  "type": "APPEND_UNIQUE",
+                  "path": "knowledge.knownFacts",
+                  "value": "OFFICIAL_CLEAR"
+                }
+              ],
+              "transition": {
+                "type": "GOTO",
+                "sceneId": "F_CLEAR"
+              }
+            },
+            {
+              "when": [
+                {
+                  "path": "world.insideSmoke",
+                  "op": "EQ",
+                  "value": false
+                },
+                {
                   "path": "world.hallSmoke",
+                  "op": "EQ",
+                  "value": false
+                },
+                {
+                  "path": "world.clear",
                   "op": "EQ",
                   "value": false
                 }
@@ -713,6 +765,11 @@
                   "path": "world.hallSmoke",
                   "op": "EQ",
                   "value": true
+                },
+                {
+                  "path": "world.clear",
+                  "op": "EQ",
+                  "value": false
                 }
               ],
               "resultText": "현관 바깥 홀 끝을 비추는 화면이 흐려지고 문 주변에 매캐한 냄새가 난다. 현관을 열지 않는다.",
@@ -855,9 +912,40 @@
             {
               "when": [
                 {
+                  "path": "world.clear",
+                  "op": "EQ",
+                  "value": true
+                }
+              ],
+              "resultText": "계단 방화문을 확인하려는 순간 현장 안내가 전달된다. 13층 해당 세대의 실내 대기를 종료해도 되지만 계단 이용이 허가된 것은 아니다. 더 내려가지 않고 현관 안으로 돌아간다.",
+              "effects": [
+                {
+                  "type": "SET",
+                  "path": "player.clearHeard",
+                  "value": true
+                },
+                {
+                  "type": "APPEND_UNIQUE",
+                  "path": "knowledge.knownFacts",
+                  "value": "OFFICIAL_CLEAR"
+                }
+              ],
+              "transition": {
+                "type": "GOTO",
+                "sceneId": "F_WAIT"
+              }
+            },
+            {
+              "when": [
+                {
                   "path": "world.stairSmoke",
                   "op": "EQ",
                   "value": true
+                },
+                {
+                  "path": "world.clear",
+                  "op": "EQ",
+                  "value": false
                 }
               ],
               "resultText": "유리 너머 아래쪽에서 회색 연기가 치고 올라온다. 방화문을 열지 않는다.",
@@ -884,6 +972,11 @@
                   "path": "world.escortOffered",
                   "op": "EQ",
                   "value": true
+                },
+                {
+                  "path": "world.clear",
+                  "op": "EQ",
+                  "value": false
                 }
               ],
               "resultText": "12층 방향 첫 계단참이 보인다. 12층과 13층 사이에서 순찰하던 관리실 방재 직원이 방화문 너머에서 말을 건넨다. 방재실 무전으로 지상 연결 계단이 아직 통행 가능한 상태임을 확인했다고 한다. 실내가 안전하면 돌아가 대기하고, 이미 나온 주민은 자신과 함께 집결 지점까지 이동할 수 있다고 안내한다.",
@@ -918,6 +1011,11 @@
                 },
                 {
                   "path": "world.escortOffered",
+                  "op": "EQ",
+                  "value": false
+                },
+                {
+                  "path": "world.clear",
                   "op": "EQ",
                   "value": false
                 }
