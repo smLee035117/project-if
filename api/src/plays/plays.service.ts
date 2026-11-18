@@ -17,6 +17,7 @@ import { createPlayId } from './play-id.js';
 
 import { loadScenarioV2 } from './scenario-loader-v2.js';
 import { createInitialPlayDataV2 } from './play-engine-v2.js';
+import { selectFireVariantV2 } from './fire-variant-v2.js';
 import { buildPlayViewV2 } from './play-view-builder-v2.js';
 
 import type { ScenarioV2 } from './types/scenario-v2.js';
@@ -313,6 +314,11 @@ export class PlaysService {
       userId,
       0,
     );
+
+    // 화재 상황은 새 플레이를 생성할 때 한 번만 추첨합니다.
+    if (scenario.scenarioId === 'apartment_fire_01') {
+      playData.scenarioState.world.incidentVariant = selectFireVariantV2();
+    }
 
     // 외부 공개 데이터 구성
     const view = buildPlayViewV2(playData, scenario);

@@ -26,6 +26,18 @@ import { RedisService } from '../redis/redis.service.js';
 import { DatabaseService } from '../database/database.service.js';
 
 import { loadScenarioV2 } from './scenario-loader-v2.js';
+import { selectFireVariantV2 } from './fire-variant-v2.js';
+
+// API 생성 경로는 유지하고 상황 선택 결과만 고정합니다.
+vi.mock('./fire-variant-v2.js', async (importOriginal) => {
+  const original =
+    await importOriginal<typeof import('./fire-variant-v2.js')>();
+
+  return {
+    ...original,
+    selectFireVariantV2: vi.fn(original.selectFireVariantV2),
+  };
+});
 
 interface ResultRow extends RowDataPacket {
   user_no: number;
@@ -47,11 +59,12 @@ let cleanupClient: ReturnType<typeof createClient>;
 const playIds: string[] = [];
 const userIds = new Set<number>();
 
-// 실제 서버는 현재 X 고정입니다.
-// Y는 테스트에서만 Redis CAS로 초기 상태를 변경합니다.
-type Variant = 'X' | 'Y';
+type Variant = 'X' | 'Y' | 'Z';
 
 async function startFirePlay(variant: Variant = 'X') {
+  // 생성 순간의 선택만 고정합니다. Redis를 사후 수정하지 않습니다.
+  vi.mocked(selectFireVariantV2).mockReturnValueOnce(variant);
+
   const response = await request(app.getHttpServer())
     .post('/v2/plays')
     .send({ scenarioId: 'apartment_fire_01' });
@@ -71,7 +84,6 @@ async function startFirePlay(variant: Variant = 'X') {
   }
 
   const cookie = rawCookie.split(';')[0];
-
   const original = await redisService.getPlayV2(playId);
 
   expect(original).not.toBeNull();
@@ -83,38 +95,10 @@ async function startFirePlay(variant: Variant = 'X') {
   userIds.add(original.userId);
 
   expect(original.scenarioId).toBe('apartment_fire_01');
-  expect(original.scenarioState.world.incidentVariant).toBe('X');
+  expect(original.scenarioState.world.incidentVariant).toBe(variant);
   expect(original.version).toBe(0);
 
-  let version = 0;
-
-  if (variant === 'Y') {
-    const changed = {
-      ...original,
-      version: original.version + 1,
-      scenarioState: {
-        ...original.scenarioState,
-        world: {
-          ...original.scenarioState.world,
-          incidentVariant: 'Y',
-        },
-      },
-    };
-
-    // 공개 API에는 아직 상황 선택 기능이 없습니다.
-    // 실제 Redis CAS를 통해 테스트용 Y 상태를 주입합니다.
-    const updated = await redisService.updatePlayV2IfVersion(
-      playId,
-      original.version,
-      changed,
-    );
-
-    expect(updated).toBe(true);
-
-    version = 1;
-  }
-
-  return { playId, cookie, version, userId: original.userId };
+  return { playId, cookie, version: 0, userId: original.userId };
 }
 
 function submitAction(
@@ -559,4 +543,34 @@ test('실제 화재 종료 시 DB 장애가 나면 Pending으로 복구한다', 
   );
 
   expect(repeated.status).toBe(409);
+});
+
+// ---------------------------------------------------------
+// 6. 실제 생성한 Z 상황이 행동 후에도 유지되는지 검증
+// ---------------------------------------------------------
+test('실제 화재 Z: 생성한 상황이 유지되고 외부로 공개되지 않는다', async () => {
+  const { playId, cookie, version } = await startFirePlay('Z');
+
+  const response = await submitAction(
+    playId, cookie, 'F_START_WAIT', version,
+  );
+
+  expect(response.status).toBe(200);
+  expect(response.body.view.version).toBe(1);
+  expect(response.body.view.storyTimeMinutes).toBe(2);
+
+  const redisData = await redisService.getPlayV2(playId);
+
+  expect(redisData?.scenarioState.world.incidentVariant).toBe('Z');
+  expect(redisData?.version).toBe(1);
+
+  const fetched = await request(app.getHttpServer())
+    .get(`/v2/plays/${playId}`)
+    .set('Cookie', cookie);
+
+  expect(fetched.status).toBe(200);
+  expect(fetched.body.version).toBe(1);
+
+  expect(JSON.stringify(fetched.body))
+    .not.toContain('incidentVariant');
 });
