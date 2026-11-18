@@ -128,8 +128,6 @@ export function executeActionV2(
     );
 
 
-
-
     const outcome = selectOutcome(timeResult.scenarioState,action.outcomes);
 
     // if(outcome.transition.type !== 'STAY') {
@@ -204,6 +202,25 @@ export function executeActionV2(
         nextPlayState = ending.state;
     }
 
+
+    let nextTimelineProgress = completeHandledEventsV2(
+        playData.timelineProgress,
+        timeResult.handledEventIds,
+    );
+
+    if (nextPlayState === 'PLAYING') {
+        nextTimelineProgress = scheduleRelativeEventsV2(
+            playData.scenarioState,
+            nextScenarioState,
+            timeResult.endMinute,
+            scenario.timeline ?? [],
+            nextTimelineProgress,
+        );
+    }
+
+
+
+
     return {
         playData : {
             ...playData,
@@ -213,6 +230,7 @@ export function executeActionV2(
             version: playData.version + 1,
             endingId: nextEndingId,
             state: nextPlayState,
+            timelineProgress: nextTimelineProgress,
         } ,
         resultText : outcome.resultText,
 
