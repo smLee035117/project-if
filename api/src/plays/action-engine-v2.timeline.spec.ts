@@ -185,4 +185,35 @@ describe('B-1: 행동 엔진과 상대 시간 이벤트 연결', () => {
     expect(ended.timelineProgress.pending).toEqual({});
     expect(ended.timelineProgress.processed).toEqual([]);
   });
+
+
+
+    test('플레이 종료 시 미래 예약을 취소하고 기존 상태는 유지한다', () => {
+        const scenario = createTimelineScenario();
+
+        // 12분 신고, 29분에 구조 이벤트 예약
+        const { reported } = beginAndReport(scenario);
+
+        expect(reported.timelineProgress.pending)
+            .toEqual({ RESCUE: 29 });
+
+        // 구조대가 도착하기 전 14분에 플레이 종료
+        const ended = run(
+            scenario,
+            reported,
+            'END_REPORT',
+        );
+
+        expect(ended.storyTimeMinutes).toBe(14);
+        expect(ended.state).toBe('CLEARED');
+
+        // 종료된 플레이에는 실행 가능한 미래 예약이 없어야 합니다.
+        expect(ended.timelineProgress.pending).toEqual({});
+        expect(ended.timelineProgress.processed).toEqual([]);
+
+        // 원본 플레이의 예약은 변경되지 않아야 합니다.
+        expect(reported.timelineProgress.pending)
+            .toEqual({ RESCUE: 29 });
+    });
+
 });

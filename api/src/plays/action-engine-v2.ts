@@ -216,6 +216,11 @@ export function executeActionV2(
             scenario.timeline ?? [],
             nextTimelineProgress,
         );
+    } else {
+        nextTimelineProgress = {
+            ...nextTimelineProgress,
+            pending: {},
+        };
     }
 
 

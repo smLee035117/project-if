@@ -458,3 +458,62 @@ describe('completeHandledEventsV2', () => {
     });
 });
 
+
+
+test('동일 시각의 이벤트는 입력 순서대로 조건을 평가한다', () => {
+    const state: ScenarioState = {
+        world: {
+            signal: false,
+            count: 0,
+        },
+        player: {},
+        knowledge: { knownFacts: [] },
+    };
+
+    const unlock: TimeEventV2 = {
+        id: 'UNLOCK',
+        atMinute: 5,
+        when: [],
+        effects: [
+            { type: 'SET', path: 'world.signal', value: true },
+        ],
+    };
+
+    const follow: TimeEventV2 = {
+        id: 'FOLLOW',
+        atMinute: 5,
+        when: [
+            { path: 'world.signal', op: 'EQ', value: true },
+        ],
+        effects: [
+            { type: 'ADD', path: 'world.count', value: 1 },
+        ],
+    };
+
+    // UNLOCK이 먼저 실행되면 FOLLOW 조건이 참이 됩니다.
+    const forward = advanceTimeV2(
+        state, 0, 5, [unlock, follow],
+    );
+
+    expect(forward.scenarioState.world.count).toBe(1);
+    expect(forward.handledEventIds).toEqual([
+        'UNLOCK',
+        'FOLLOW',
+    ]);
+
+    // FOLLOW가 먼저 평가되면 조건이 아직 거짓입니다.
+    const reverse = advanceTimeV2(
+        state, 0, 5, [follow, unlock],
+    );
+
+    expect(reverse.scenarioState.world.count).toBe(0);
+    expect(reverse.handledEventIds).toEqual([
+        'FOLLOW',
+        'UNLOCK',
+    ]);
+
+    // 원본 상태는 변경되지 않습니다.
+    expect(state.world.signal).toBe(false);
+    expect(state.world.count).toBe(0);
+});
+
