@@ -7,10 +7,11 @@ import { DatabaseModule } from '../database/database.module.js';
 import { RedisModule } from '../redis/redis.module.js';
 
 import { PlaysV2Controller } from './plays-v2.controller.js';
+import { DevPlaygroundController } from './dev-playground.controller.js';
 
 @Module({
   imports: [DatabaseModule , RedisModule],
-  controllers: [PlaysController, PlaysV2Controller,],
+  controllers: [PlaysController, PlaysV2Controller, DevPlaygroundController,],
   providers: [PlaysService,PlayRecoveryBootstrapService]
 })
 export class PlaysModule {}

@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Project IF | 개발용 플레이 화면</title>
+  <style>
+    :root { color-scheme: dark; font-family: system-ui, -apple-system, 'Malgun Gothic', sans-serif; background: #101722; color: #edf3fc; }
+    * { box-sizing: border-box; }
+    body { margin: 0; padding: 24px; }
+    .shell { max-width: 1240px; margin: auto; }
+    header, .tools, .status, .grid, .section-head { display: flex; gap: 12px; align-items: center; justify-content: space-between; }
+    header { margin-bottom: 22px; }
+    h1 { margin: 0; font-size: 24px; } h2 { margin: 0 0 12px; font-size: 18px; }
+    p { line-height: 1.7; }
+    small, .muted { color: #a5b4c9; }
+    .grid { align-items: start; display: grid; grid-template-columns: minmax(0,1.2fr) minmax(340px,1fr); gap: 18px; }
+    .panel { background: #1b2534; border: 1px solid #354257; border-radius: 14px; padding: 20px; margin-bottom: 16px; }
+    select, button { border: 1px solid #4c5c73; background: #26364c; color: #f4f8ff; border-radius: 9px; padding: 10px 13px; font: inherit; }
+    button { cursor: pointer; } button:hover:not(:disabled) { background: #375273; } button:disabled { opacity: .45; cursor: not-allowed; }
+    button.primary { background: #2a64aa; border-color: #3779cf; }
+    button.action { display: block; width: 100%; text-align: left; margin: 10px 0; }
+    button.action:disabled { text-decoration: line-through; }
+    .status { flex-wrap: wrap; border-bottom: 1px solid #3b4b61; padding-bottom: 15px; margin-bottom: 15px; }
+    .tag { border: 1px solid #4f6782; border-radius: 20px; padding: 5px 12px; font-size: 13px; }
+    .result { border-left: 3px solid #76aef2; background: #22354c; padding: 10px 14px; margin-top: 16px; white-space: pre-wrap; }
+    pre { background: #101a28; padding: 15px; border-radius: 8px; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12px; max-height: 360px; overflow: auto; }
+    details { margin-top: 14px; } summary { cursor: pointer; font-weight: 600; }
+    .error { color: #ff999e; } .empty { color: #a5b4c9; }
+    .section-head { margin-bottom: 8px; }
+    @media (max-width: 850px) { .grid { grid-template-columns: 1fr; } header, .tools { flex-wrap: wrap; } body { padding: 12px; } }
+  </style>
+</head>
+<body>
+<div class="shell">
+  <header>
+    <div><h1>Project IF</h1><small>V2 플레이그라운드 · 실제 API 연결 · 로컬 개발 전용</small></div>
+    <div class="tools">
+      <select id="scenario" aria-label="시나리오 선택">
+        <option value="apartment_fire_01">화재 · 경보가 울린 밤</option>
+        <option value="blackout_resource_01">정전</option>
+        <option value="lost_hiking_01">조난</option>
+        <option value="basement_flood_01">침수</option>
+      </select>
+      <button id="start" class="primary">새 플레이 시작</button>
+    </div>
+  </header>
+  <div class="grid">
+    <main>
+      <section class="panel">
+        <div class="status"><strong id="title">시나리오를 시작하세요</strong><span class="tag" id="state">미시작</span><span class="tag" id="clock">0분</span><span class="tag" id="version">v0</span></div>
+        <small id="scene-id">장면 없음</small>
+        <p id="scene-text" class="empty">위의 '새 플레이 시작'을 누르면 현재 장면이 표시됩니다.</p>
+        <h2>선택 가능한 행동</h2>
+        <div id="actions"><p class="empty">플레이 시작 전입니다.</p></div>
+        <div id="result" class="result" hidden></div>
+        <p id="error" class="error" role="alert"></p>
+      </section>
+    </main>
+    <aside>
+      <section class="panel"><div class="section-head"><h2>내부 상태 디버그</h2><button id="refresh" disabled>다시 조회</button></div><small>게임 화면에 노출되지 않는 상태까지 포함됩니다.</small><pre id="debug">플레이 시작 후 표시됩니다.</pre></section>
+      <section class="panel"><h2>HTTP 요청·응답</h2><small>최대 12개의 최근 요청을 보여줍니다.</small><div id="logs"><p class="empty">아직 요청이 없습니다.</p></div></section>
+    </aside>
+  </div>
+</div>
+<script>
+(() => {
+  'use strict';
+  const el = (id) => document.getElementById(id);
+  let playId = null;
+  let view = null;
+  let busy = false;
+  const logs = [];
+
+  function render() {
+    el('title').textContent = view?.scenarioTitle ?? '시나리오를 시작하세요';
+    el('state').textContent = view?.state ?? '미시작';
+    el('clock').textContent = String(view?.storyTimeMinutes ?? 0) + '분';
+    el('version').textContent = 'v' + String(view?.version ?? 0);
+    el('scene-id').textContent = view?.currentSceneId ? '장면 · ' + view.currentSceneId : '장면 없음';
+    el('scene-text').textContent = view?.sceneDescription ?? '위의 새 플레이 시작을 누르세요.';
+    el('start').disabled = busy;
+    el('scenario').disabled = busy;
+    el('refresh').disabled = busy || !playId;
+    const container = el('actions');
+    container.replaceChildren();
+    if (!view?.actions?.length) {
+      const p = document.createElement('p');
+      p.className = 'empty';
+      p.textContent = view?.ending ? '종료: ' + view.ending.title + ' — ' + view.ending.description : '현재 실행 가능한 행동이 없습니다.';
+      container.appendChild(p);
+      return;
+    }
+    for (const action of view.actions) {
+      const button = document.createElement('button');
+      button.className = 'action';
+      button.textContent = action.text + (action.available ? '' : ' (실행 불가)');
+      button.disabled = busy || !action.available || view.state !== 'PLAYING';
+      button.addEventListener('click', () => runAction(action.id));
+      container.appendChild(button);
+    }
+  }
+
+  async function callApi(method, url, data) {
+    const requestBody = data === undefined ? undefined : JSON.stringify(data);
+    const response = await fetch(url, {
+      method,
+      credentials: 'same-origin',
+      cache: 'no-store',
+      headers: requestBody === undefined ? {} : {'Content-Type': 'application/json'},
+      body: requestBody,
+    });
+    const raw = await response.text();
+    let result;
+    try { result = JSON.parse(raw); } catch { result = {raw: raw.slice(0, 2000)}; }
+    logs.unshift({method, url, status: response.status, request: data ?? null, response: result});
+    logs.splice(12);
+    showLogs();
+    if (!response.ok) throw new Error(result.message ?? 'HTTP ' + response.status);
+    return result;
+  }
+
+  function showLogs() {
+    el('logs').replaceChildren();
+    for (const item of logs) {
+      const details = document.createElement('details');
+      const summary = document.createElement('summary');
+      summary.textContent = item.method + ' ' + item.url + ' → ' + item.status;
+      const pre = document.createElement('pre');
+      pre.textContent = JSON.stringify({request: item.request, response: item.response}, null, 2);
+      details.append(summary, pre);
+      el('logs').appendChild(details);
+    }
+  }
+
+  async function debugRefresh() {
+    if (!playId) return;
+    const debug = await callApi('GET', '/dev/plays/' + encodeURIComponent(playId) + '/debug');
+    el('debug').textContent = JSON.stringify(debug, null, 2);
+  }
+
+  async function execute(work) {
+    if (busy) return;
+    busy = true;
+    el('error').textContent = '';
+    render();
+    try { await work(); }
+    catch (error) {
+      el('error').textContent = String(error.message ?? error);
+      if (playId) {
+        try { view = await callApi('GET', '/v2/plays/' + encodeURIComponent(playId)); await debugRefresh(); }
+        catch { /* preserve original error */ }
+      }
+    } finally { busy = false; render(); }
+  }
+
+  async function start() {
+  await execute(async () => {
+    playId = null;
+    view = null;
+
+    // 새 플레이 시작 시 이전 HTTP 기록 초기화
+    logs.length = 0;
+    showLogs();
+
+    el('result').hidden = true;
+    el('debug').textContent = '조회 중...';
+
+    const data = await callApi('POST', '/v2/plays', {
+      scenarioId: el('scenario').value
+    });
+
+    playId = data.playId;
+    view = data.view;
+
+    await debugRefresh();
+  });
+}
+
+  async function runAction(actionId) {
+    await execute(async () => {
+      if (!playId || !view) return;
+      const data = await callApi('POST', '/v2/plays/' + encodeURIComponent(playId) + '/actions', {
+        actionId, expectedVersion: view.version,
+      });
+      view = data.view;
+      el('result').textContent = data.resultText;
+      el('result').hidden = false;
+      await debugRefresh();
+    });
+  }
+
+  el('start').addEventListener('click', start);
+  el('refresh').addEventListener('click', () => execute(async () => {
+    view = await callApi('GET', '/v2/plays/' + encodeURIComponent(playId));
+    await debugRefresh();
+  }));
+  render();
+})();
+</script>
+</body>
+</html>
