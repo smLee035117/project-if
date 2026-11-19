@@ -28,6 +28,10 @@
     details { margin-top: 14px; } summary { cursor: pointer; font-weight: 600; }
     .error { color: #ff999e; } .empty { color: #a5b4c9; }
     .section-head { margin-bottom: 8px; }
+    #history-panel { border-top: 1px solid #3b4b61; margin-top: 20px; padding-top: 20px; }
+    #history-list { padding-left: 26px; }
+    #history-list li { margin: 0 0 18px; line-height: 1.5; }
+    #history-list p { margin: 6px 0 0; white-space: pre-wrap; }
     @media (max-width: 850px) { .grid { grid-template-columns: 1fr; } header, .tools { flex-wrap: wrap; } body { padding: 12px; } }
   </style>
 </head>
@@ -54,6 +58,10 @@
         <h2>선택 가능한 행동</h2>
         <div id="actions"><p class="empty">플레이 시작 전입니다.</p></div>
         <div id="result" class="result" hidden></div>
+        <section id="history-panel" hidden aria-labelledby="history-heading">
+          <h2 id="history-heading">플레이 행동 이력</h2>
+          <ol id="history-list"></ol>
+        </section>
         <p id="error" class="error" role="alert"></p>
       </section>
     </main>
@@ -82,6 +90,7 @@
     el('start').disabled = busy;
     el('scenario').disabled = busy;
     el('refresh').disabled = busy || !playId;
+    renderHistory();
     const container = el('actions');
     container.replaceChildren();
     if (!view?.actions?.length) {
@@ -98,6 +107,38 @@
       button.disabled = busy || !action.available || view.state !== 'PLAYING';
       button.addEventListener('click', () => runAction(action.id));
       container.appendChild(button);
+    }
+  }
+
+  function renderHistory() {
+    const finished = view?.state === 'CLEARED' || view?.state === 'FAILED';
+    const panel = el('history-panel');
+    const list = el('history-list');
+    list.replaceChildren();
+    panel.hidden = !finished;
+    if (!finished) return;
+
+    const entries = Array.isArray(view?.actionHistory)
+      ? [...view.actionHistory].sort((a, b) => a.sequence - b.sequence)
+      : [];
+    if (!entries.length) {
+      const item = document.createElement('li');
+      item.textContent = '기록된 행동이 없습니다.';
+      list.appendChild(item);
+      return;
+    }
+
+    for (const entry of entries) {
+      const item = document.createElement('li');
+      const heading = document.createElement('strong');
+      heading.textContent = String(entry.sequence) + '. ' + entry.actionText;
+      const timing = document.createElement('small');
+      timing.textContent = '게임 시각 ' + entry.startedAtMinute + '분 → ' + entry.endedAtMinute + '분';
+      timing.style.display = 'block';
+      const result = document.createElement('p');
+      result.textContent = entry.resultText;
+      item.append(heading, timing, result);
+      list.appendChild(item);
     }
   }
 
