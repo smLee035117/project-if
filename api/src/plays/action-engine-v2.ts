@@ -5,13 +5,14 @@ import type {
     ExecuteActionResultV2,
 } from './types/play-v2.js';
 
-import type { ScenarioV2, OutcomeV2, TimeEventV2,} from './types/scenario-v2.js';
+import type { ScenarioV2, OutcomeV2, TimeEventV2, ActionEvaluationContextV2,} from './types/scenario-v2.js';
 
 
 
 import {
     evaluateConditions,
     applyEffect,
+    assertActionConditionVisibleV2,
 } from './state-engine-v2.js';
 
 export {
@@ -28,6 +29,7 @@ import { advanceTimeV2 ,scheduleRelativeEventsV2, buildScheduledTimeEventsV2, co
 export function selectOutcome(
     state: ScenarioState,
     outcomes: OutcomeV2[],
+    context?: ActionEvaluationContextV2,
 ): OutcomeV2 {
 
     const matched: OutcomeV2[] = [];
@@ -36,7 +38,7 @@ export function selectOutcome(
     for( const outcome of outcomes) {
     // 2. evaluateConditions()로 각 결과의 when 검사
 
-        if(evaluateConditions(state,outcome.when)) {
+        if(evaluateConditions(state,outcome.when,context)) {
             // 3. 조건이 참이라면 matched 배열에 추가
             matched.push(outcome);
         }
@@ -107,8 +109,20 @@ export function executeActionV2(
          throw new Error('현재 장면에 요청한 행동이 존재하지 않습니다.');
     }
 
+    const startContext : ActionEvaluationContextV2 = {
+        startState :playData.scenarioState,
+        endState : playData.scenarioState,
+        startMinute : playData.storyTimeMinutes,
+        endMinute :  playData.storyTimeMinutes
+    };
+
+
+    for (const condition of action.when) {
+        assertActionConditionVisibleV2(condition);
+    }
+
     // 행동의 when 조건을 만족하는지
-    if(!evaluateConditions(playData.scenarioState,action.when) ) {
+    if(!evaluateConditions(playData.scenarioState,action.when,startContext) ) {
         throw new Error('행동 조건을 만족하지 않습니다.');
     }
 
@@ -127,8 +141,14 @@ export function executeActionV2(
         ],
     );
 
+    const actionContext : ActionEvaluationContextV2 = {
+         startState :playData.scenarioState,
+        endState : timeResult.scenarioState,
+        startMinute : playData.storyTimeMinutes,
+        endMinute :  timeResult.endMinute
+    };
 
-    const outcome = selectOutcome(timeResult.scenarioState,action.outcomes);
+    const outcome = selectOutcome(timeResult.scenarioState,action.outcomes,actionContext);
 
     // if(outcome.transition.type !== 'STAY') {
     //      throw new Error('transition type을 만족하지 않습니다.');
@@ -140,6 +160,7 @@ export function executeActionV2(
     const nextScenarioState = applyEffect(
         timeResult.scenarioState,
         outcome.effects,
+        actionContext
     );
 
 

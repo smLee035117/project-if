@@ -1,12 +1,13 @@
 
 import type { PlayDataV2 , ScenarioState} from './types/play-v2.js';
-import type { ScenarioV2 , SceneV2} from './types/scenario-v2.js';
+import type { ScenarioV2 , SceneV2 ,    ActionEvaluationContextV2,} from './types/scenario-v2.js';
 import type {
     PlayViewV2,
     PlayActionViewV2,
 } from './types/play-view-v2.js';
 
-import { evaluateConditions } from './state-engine-v2.js';
+import { evaluateConditions,
+    assertActionConditionVisibleV2, } from './state-engine-v2.js';
 
 export function buildPlayViewV2(
     playData: PlayDataV2,
@@ -29,30 +30,31 @@ export function buildPlayViewV2(
         throw new Error('현재 장면을 찾을 수 없습니다.');
     }
 
+    const startContext: ActionEvaluationContextV2 = {
+        startState: playData.scenarioState,
+        endState: playData.scenarioState,
+        startMinute: playData.storyTimeMinutes,
+        endMinute: playData.storyTimeMinutes,
+    };
+
     // 현재 플레이 중일 때만 행동 제공
     const actions: PlayActionViewV2[] =
         playData.state === 'PLAYING'
             ? scene.actions.map((action) => {
-                  // 숨겨진 world 상태를 행동 가능 여부로 노출하지 않음
-                  if (
-                      action.when.some((condition) =>
-                          condition.path.startsWith('world.'),
-                      )
-                  ) {
-                      throw new Error(
-                          '행동 실행 조건에 비공개 world 상태를 사용할 수 없습니다.',
-                      );
-                  }
+                for (const condition of action.when) {
+                    assertActionConditionVisibleV2(condition);
+                }
 
-                  return {
-                      id: action.id,
-                      text: action.text,
-                      available: evaluateConditions(
-                          playData.scenarioState,
-                          action.when,
-                      ),
-                  };
-              })
+                return {
+                    id: action.id,
+                    text: action.text,
+                    available: evaluateConditions(
+                        playData.scenarioState,
+                        action.when,
+                        startContext,
+                    ),
+                };
+            })
             : [];
 
     // 종료된 경우에만 엔딩 제공

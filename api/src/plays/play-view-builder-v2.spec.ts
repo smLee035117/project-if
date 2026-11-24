@@ -153,7 +153,7 @@ describe('buildPlayViewV2', () => {
 
         expect(() =>
             buildPlayViewV2(playData, testScenario),
-        ).toThrow('행동 실행 조건에 비공개 world 상태를 사용할 수 없습니다.');
+        ).toThrow('비공개 world 상태를 행동 실행 조건에 사용할 수 없습니다.');
     });
 
     it('종료된 플레이에서는 행동을 숨기고 엔딩을 제공한다', () => {

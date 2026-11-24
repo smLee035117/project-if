@@ -25,7 +25,7 @@ const scenario: ScenarioV2 = {
     knowledge: {
       knownFacts: ['alarm_heard'],
     },
-    
+
   },
   scenes: [
     {
@@ -55,7 +55,7 @@ const scenario: ScenarioV2 = {
 
 
 test('V2 상태값 변경 확인하기', () => {
-    
+
     const effects: EffectV2[] = [
         {
             type: 'SET',
@@ -63,7 +63,7 @@ test('V2 상태값 변경 확인하기', () => {
             value: true,
         },
     ];
-    
+
     const nextState = applyEffect(playDataV2.scenarioState,effects);
 
 
@@ -74,7 +74,7 @@ test('V2 상태값 변경 확인하기', () => {
 
 
 test('V2 상태값 변경 여러개 동시에 적용되는지 확인하기', () => {
-    
+
     const effects: EffectV2[] = [
         {
             type: 'SET',
@@ -87,7 +87,7 @@ test('V2 상태값 변경 여러개 동시에 적용되는지 확인하기', () 
             value: 'HALLWAY',
         },
     ];
-    
+
     const nextState = applyEffect(playDataV2.scenarioState,effects);
 
 
@@ -104,7 +104,7 @@ test('V2 상태값 변경 여러개 동시에 적용되는지 확인하기', () 
 
 
 test('V2 다중 효과 적용 중 오류 발생 시 원본 상태를 유지한다', () => {
-    
+
     const effects: EffectV2[] = [
         {
             type: 'SET',
@@ -119,7 +119,7 @@ test('V2 다중 효과 적용 중 오류 발생 시 원본 상태를 유지한�
     ];
     //expect(() => validateScenarioV2(scenario)).toThrow();
     expect(() => applyEffect(playDataV2.scenarioState,effects)).toThrow('존재하지 않는 값입니다.');
-    
+
 
     expect(playDataV2.scenarioState.player.reported119).toBe(false);
     expect(playDataV2.scenarioState.player.location).toBe('HOME_LIVING');
@@ -653,13 +653,7 @@ test('시간 이벤트가 행동 결과 선택에 반영된다', () => {
     scene.actions.push({
         id: 'CHECK_DOOR',
         text: '현관 상황을 확인한다.',
-        when: [
-            {
-                path: 'world.insideSmoke',
-                op: 'EQ',
-                value: false,
-            },
-        ],
+        when: [],
         durationMinutes: 5,
         outcomes: [
             {

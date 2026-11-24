@@ -1,6 +1,14 @@
 import type { ScenarioState } from './types/play-v2.js';
-import type { ScenarioV2 } from './types/scenario-v2.js';
+import type {
+    ScenarioV2,
+    ConditionV2,
+} from './types/scenario-v2.js';
+
 import { getStateValue } from './state-access-v2.js';
+
+import {
+    assertActionConditionVisibleV2,
+} from './state-engine-v2.js';
 
 // null과 배열을 제외한 객체인지 확인
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -10,7 +18,62 @@ function isRecord(value: unknown): value is Record<string, unknown> {
         !Array.isArray(value)
     );
 }
+type ReferenceScopeV2 = 'NONE' | 'START' | 'ACTION';
 
+function validateValueReference(
+    reference: unknown,
+    label: string,
+    initialState: ScenarioState,
+    scope: ReferenceScopeV2,
+): string | number | boolean | string[] {
+    if (!isRecord(reference)) {
+        throw new Error(`${label}는 객체여야 합니다.`);
+    }
+
+    if (scope === 'NONE') {
+        throw new Error(
+            `${label}: 행동 평가 참조를 사용할 수 없습니다.`,
+        );
+    }
+
+    if (
+        reference.at !== 'ACTION_START' &&
+        reference.at !== 'ACTION_END'
+    ) {
+        throw new Error(`${label}.at이 올바르지 않습니다.`);
+    }
+
+    if (
+        scope === 'START' &&
+        reference.at !== 'ACTION_START'
+    ) {
+        throw new Error(
+            `${label}: ACTION_START만 참조할 수 있습니다.`,
+        );
+    }
+
+    if (reference.kind === 'TIME') {
+        if (Object.hasOwn(reference, 'path')) {
+            throw new Error(
+                `${label}: TIME 참조에는 path를 사용할 수 없습니다.`,
+            );
+        }
+
+        return 0;
+    }
+
+    if (reference.kind === 'STATE') {
+        if (!isNonEmptyString(reference.path)) {
+            throw new Error(
+                `${label}.path가 올바르지 않습니다.`,
+            );
+        }
+
+        return getStateValue(initialState, reference.path);
+    }
+
+    throw new Error(`${label}.kind가 올바르지 않습니다.`);
+}
 // 비어 있지 않은 문자열인지 확인
 function isNonEmptyString(value: unknown): value is string {
  
@@ -37,67 +100,152 @@ function validateCondition(
     condition: unknown,
     label: string,
     initialState: ScenarioState,
+    scope: ReferenceScopeV2 = 'NONE',
 ): void {
-    // 조건 객체인지 확인
-    // path 유효성 검사
-    // 연산자별 유효성 검사
-    // 값의 자료형 검사
-    
-    // 1. condition이 객체인지 검사
-    
     if (!isRecord(condition)) {
         throw new Error(`${label}는 객체여야 합니다.`);
     }
-    // 2. condition.path가 유효한 문자열인지 검사
-    if(!isNonEmptyString(condition.path)){
-        throw new Error(`${label}.path가 올바르지 않습니다.`);
+
+    // AND / OR 그룹 검증
+    if (condition.op === 'AND' || condition.op === 'OR') {
+        if (!Array.isArray(condition.conditions)) {
+            throw new Error(
+                `${label}.conditions는 배열이어야 합니다.`,
+            );
+        }
+
+        for (const [index, child] of condition.conditions.entries()) {
+            validateCondition(
+                child,
+                `${label}.conditions[${index}]`,
+                initialState,
+                scope,
+            );
+        }
+
+        return;
     }
 
-    // 3. condition.op가 지원하는 연산자인지 검사
+    // NOT 그룹 검증
+    if (condition.op === 'NOT') {
+        validateCondition(
+            condition.condition,
+            `${label}.condition`,
+            initialState,
+            scope,
+        );
 
+        return;
+    }
+
+    let leftValue: string | number | boolean | string[];
+    let rightValue: string | number | boolean | string[];
+
+    const hasPath = Object.hasOwn(condition, 'path');
+    const hasLeft = Object.hasOwn(condition, 'left');
+
+    if (hasPath === hasLeft) {
+        throw new Error(
+            `${label}.path 또는 left가 올바르지 않습니다.`,
+        );
+    }
+
+    // 기존 path 기반 조건
+    if (hasPath) {
+        if (!isNonEmptyString(condition.path)) {
+            throw new Error(
+                `${label}.path가 올바르지 않습니다.`,
+            );
+        }
+
+        leftValue = getStateValue(
+            initialState,
+            condition.path,
+        );
+
+        if (!isStateValue(condition.value)) {
+            throw new Error(
+                `${label}.value가 올바르지 않습니다.`,
+            );
+        }
+
+        rightValue = condition.value;
+
+    } else {
+        // 동적 참조 조건
+        leftValue = validateValueReference(
+            condition.left,
+            `${label}.left`,
+            initialState,
+            scope,
+        );
+
+        if (isRecord(condition.value)) {
+            rightValue = validateValueReference(
+                condition.value,
+                `${label}.value`,
+                initialState,
+                scope,
+            );
+        } else {
+            if (!isStateValue(condition.value)) {
+                throw new Error(
+                    `${label}.value가 올바르지 않습니다.`,
+                );
+            }
+
+            rightValue = condition.value;
+        }
+    }
+
+    // 연산자별 자료형 검증
     switch (condition.op) {
         case 'EQ':
         case 'NEQ':
+            if (
+                Array.isArray(leftValue) ||
+                Array.isArray(rightValue) ||
+                typeof leftValue !== typeof rightValue
+            ) {
+                throw new Error(
+                    `${label}의 값 형식이 다릅니다.`,
+                );
+            }
+
             break;
 
         case 'GT':
         case 'GTE':
         case 'LT':
-        case 'LTE': {
-                const checkVal = getStateValue(initialState, condition.path);
-                if(
-                    typeof checkVal !== 'number' || typeof condition.value !== 'number' 
-                ) {
-                    throw new Error(`${label}.value는 숫자여야 합니다.`);
-                }
+        case 'LTE':
+            if (
+                typeof leftValue !== 'number' ||
+                typeof rightValue !== 'number'
+            ) {
+                throw new Error(
+                    `${label}.value는 숫자여야 합니다.`,
+                );
             }
+
             break;
 
-        case 'INCLUDES': {
-                const checkVal = getStateValue(initialState, condition.path);
-
-                if (
-                    !Array.isArray(checkVal) ||
-                    typeof condition.value !== 'string'
-                ) {
-                    throw new Error(`${label}.INCLUDES 자료형이 올바르지 않습니다.`);
-                }
-
-                return;
+        case 'INCLUDES':
+            if (
+                !Array.isArray(leftValue) ||
+                typeof rightValue !== 'string'
+            ) {
+                throw new Error(
+                    `${label}.INCLUDES 자료형이 올바르지 않습니다.`,
+                );
             }
+
+            break;
+
         default:
-            throw new Error(`${label}.op가 올바르지 않습니다.`);
+            throw new Error(
+                `${label}.op가 올바르지 않습니다.`,
+            );
     }
-
-
-    // 5. validateStateValueType()으로 상태 필드와 자료형 비교
-    validateStateValueType(
-        initialState,
-        condition.path,
-        condition.value,
-    );
-
-
 }
 
 
@@ -130,6 +278,7 @@ function validateEffect(
     effect: unknown,
     label: string,
     initialState: ScenarioState,
+    scope: ReferenceScopeV2 = 'NONE',
 ): void {
     if (!isRecord(effect)) {
         throw new Error(`${label}는 객체여야 합니다.`);
@@ -146,6 +295,31 @@ function validateEffect(
                 effect.path,
                 effect.value,
             );
+            break;
+        }
+        case 'SET_FROM': {
+            if (
+                !effect.path.startsWith('world.') &&
+                !effect.path.startsWith('player.')
+            ) {
+                throw new Error(
+                    `${label}.path가 올바르지 않습니다.`,
+                );
+            }
+
+            const referencedValue = validateValueReference(
+                effect.from,
+                `${label}.from`,
+                initialState,
+                scope,
+            );
+
+            validateStateValueType(
+                initialState,
+                effect.path,
+                referencedValue,
+            );
+
             break;
         }
 
@@ -625,17 +799,12 @@ if (value.timeEvents !== undefined) {
                     condition,
                     conditionLabel,
                     value.initialState,
+                    'START',
                 );
 
-                if (
-                    isRecord(condition) &&
-                    typeof condition.path === 'string' &&
-                    condition.path.startsWith('world.')
-                ) {
-                    throw new Error(
-                        `${conditionLabel}: 비공개 world 상태를 행동 실행 조건에 사용할 수 없습니다.`,
-                    );
-                }
+                assertActionConditionVisibleV2(
+                    condition as ConditionV2,
+                );
             }
 
             //action.outcomes
@@ -665,6 +834,7 @@ if (value.timeEvents !== undefined) {
                         outcomeCondi,
                         outcomeCondiLabel,
                         value.initialState,
+                          'ACTION',
                     );
 
 
@@ -681,6 +851,7 @@ if (value.timeEvents !== undefined) {
                         effect,
                         `${outcomeLabel}.effects[${effectIndex}]`,
                         value.initialState,
+                          'ACTION',
                     );
                 }
 

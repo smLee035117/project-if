@@ -1,6 +1,6 @@
 
 import type { ScenarioState } from './types/play-v2.js';
-import type { ConditionV2, EffectV2 } from './types/scenario-v2.js';
+import type { ConditionV2, EffectV2, ValueReferenceV2, ActionEvaluationContextV2, } from './types/scenario-v2.js';
 import { getStateValue } from './state-access-v2.js';
 
 
@@ -9,16 +9,54 @@ import { getStateValue } from './state-access-v2.js';
 export function evaluateCondition(
     state: ScenarioState,
     condition: ConditionV2,
+    context?: ActionEvaluationContextV2,
 ): boolean {
 
-    const currentValue = getStateValue(
-        state,
-        condition.path,
-    );
+    if (condition.op === 'AND') {
+        return condition.conditions.every(
+            (child) => evaluateCondition(state, child, context)
+        );
 
-    const value = condition.value;
 
-    
+    } else if(condition.op === 'OR') {
+        return condition.conditions.some(
+            (child) => evaluateCondition(state, child, context)
+        );
+    } else if(condition.op === 'NOT'){
+        return !evaluateCondition(state, condition.condition,context);
+    }
+
+
+
+    let currentValue: string | number | boolean | string[];
+    let value: string | number | boolean | string[];
+
+
+    if('path' in condition) {
+        currentValue = getStateValue(
+            state,
+            condition.path,
+        );
+
+        value = condition.value;
+
+    } else {
+
+        if(undefined === context) {
+            throw new Error('context 값이 없습니다.');
+        }
+
+        currentValue = resolveValueReferenceV2(condition.left,context);
+
+        value = typeof condition.value === 'object'
+        ? resolveValueReferenceV2(condition.value,context)
+        : condition.value;
+
+    }
+
+
+
+
 
     switch (condition.op) {
         case 'EQ':
@@ -54,20 +92,51 @@ export function evaluateCondition(
         case 'INCLUDES':
             {
                 if ( !Array.isArray(currentValue) ||
-                    typeof condition.value !== 'string') {
+                    typeof value !== 'string') {
                         throw new Error('INCLUDES 연산자의 자료형이 올바르지 않습니다.');
                 }
 
-                return currentValue.includes(condition.value);
+                return currentValue.includes(value);
             }
 
         default:
             throw new Error('지원하지 않는 조건 연산자입니다.');
     }
-  
 
-  
-    
+
+
+
+
+}
+
+export function resolveValueReferenceV2(
+    reference: ValueReferenceV2,
+    context: ActionEvaluationContextV2,
+): string | number | boolean | string[] {
+
+    // 직접 구현
+
+
+
+
+
+    switch(reference.kind) {
+        case 'STATE':
+        const state = reference.at === 'ACTION_START'
+        ? context.startState
+        : context.endState;
+
+        return getStateValue(state,reference.path);
+
+        case 'TIME':
+            const minute = reference.at === 'ACTION_START'
+            ?  context.startMinute
+            : context.endMinute;
+        return minute;
+
+
+    }
+
 
 }
 
@@ -75,11 +144,12 @@ export function evaluateCondition(
 export function evaluateConditions(
     state: ScenarioState,
     conditions:  ConditionV2[],
+     context?: ActionEvaluationContextV2,
 ): boolean {
 
 
     return conditions.every(
-        (condition) => evaluateCondition(state, condition)
+        (condition) => evaluateCondition(state, condition , context)
     );
 
 }
@@ -89,6 +159,7 @@ export function evaluateConditions(
 export function applyEffect(
     state: ScenarioState,
     effects: EffectV2[],
+    context?: ActionEvaluationContextV2,
 ) :ScenarioState {
 
     const nextState = structuredClone(state);
@@ -130,10 +201,11 @@ export function applyEffect(
             continue;
         }
 
-        if (effect.type !== 'SET' && effect.type !== 'ADD') {
+        if (effect.type !== 'SET' && effect.type !== 'ADD' &&
+            effect.type !== 'SET_FROM' ) {
             throw new Error('지원하지 않는 처리입니다.');
         }
-    
+
         const [section, key] = effect.path.split('.');
         if (
             (section !== 'world' && section !== 'player') ||
@@ -144,30 +216,54 @@ export function applyEffect(
 
         const currentValue = getStateValue(nextState, effect.path);
 
-        if (typeof currentValue !== typeof effect.value) {
-           throw new Error(`${effect.path}의 값 형식이 다릅니다.`);
-        } 
+        let value: string | number | boolean | string[];
 
-        if(typeof effect.value === 'number'  && !Number.isFinite(effect.value)) {
+
+
+        if (effect.type === 'SET_FROM') {
+
+            // context가 없으면 오류 발생
+             if(context === undefined) {
+                throw new Error('context 값이 필요합니다.');
+            }
+            // effect.from을 해석하여 value에 대입
+            value = resolveValueReferenceV2(effect.from,context);
+
+        } else {
+
+            // 기존 effect.value를 value에 대입
+            value = effect.value;
+        }
+
+        if (Array.isArray(value)) {
+            throw new Error('배열 값은 대입할 수 없습니다.');
+        }
+
+
+        if (typeof currentValue !== typeof value) {
+           throw new Error(`${effect.path}의 값 형식이 다릅니다.`);
+        }
+
+        if(typeof value === 'number'  && !Number.isFinite(value)) {
             throw new Error(`value 범위가 올바르지 않습니다.`);
         }
 
-        // SET 일때
-        if(effect.type === 'SET') { 
-            nextState[section][key] = effect.value;
+        // SET 또는 SET_FROM 일때
+        if(effect.type === 'SET' || effect.type === 'SET_FROM') {
+            nextState[section][key] = value;
         }
-        
+
 
         // ADD 일때
         if (effect.type === 'ADD') {
             if (
                 typeof currentValue !== 'number' ||
-                typeof effect.value !== 'number'
+                typeof value !== 'number'
             ) {
                 throw new Error('ADD는 숫자 상태에만 사용할 수 있습니다.');
             }
 
-            const result = currentValue + effect.value;
+            const result = currentValue + value;
 
             if (!Number.isFinite(result)) {
                 throw new Error('ADD 계산 결과가 올바르지 않습니다.');
@@ -175,11 +271,60 @@ export function applyEffect(
 
             nextState[section][key] = result;
         }
-            
 
-        
+
+
     }
 
 
     return nextState;
+}
+
+
+export function assertActionConditionVisibleV2(
+    condition: ConditionV2,
+): void {
+    if (condition.op === 'AND' || condition.op === 'OR') {
+        for (const child of condition.conditions) {
+            assertActionConditionVisibleV2(child);
+        }
+
+        return;
+    }
+
+    if (condition.op === 'NOT') {
+        assertActionConditionVisibleV2(condition.condition);
+        return;
+    }
+
+    function checkPath(path: string): void {
+        if (path.startsWith('world.')) {
+            throw new Error(
+                '비공개 world 상태를 행동 실행 조건에 사용할 수 없습니다.',
+            );
+        }
+    }
+
+    function checkReference(reference: ValueReferenceV2): void {
+        if (reference.kind === 'STATE') {
+            checkPath(reference.path);
+        }
+
+        if (reference.at !== 'ACTION_START') {
+            throw new Error(
+                '행동 실행 조건은 ACTION_START만 참조할 수 있습니다.',
+            );
+        }
+    }
+
+    if ('path' in condition) {
+        checkPath(condition.path);
+        return;
+    }
+
+    checkReference(condition.left);
+
+    if (typeof condition.value === 'object') {
+        checkReference(condition.value);
+    }
 }

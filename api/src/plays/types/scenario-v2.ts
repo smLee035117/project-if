@@ -85,11 +85,50 @@ export type OutcomeV2 = {
     effects: EffectV2[];
     transition: TransitionV2;
 }
+export type ValueReferenceV2 =
+  | {
+  kind : 'STATE';
+  at : 'ACTION_START' | 'ACTION_END';
+  path : string;
+}
 
-export type ConditionV2 = {
+ | {
+    kind : 'TIME';
+    at : 'ACTION_START' | 'ACTION_END';
+  };
+
+  export type ActionEvaluationContextV2 =
+  {
+    startState: ScenarioState;
+    endState: ScenarioState;
+    startMinute: number;
+    endMinute: number;
+  };
+
+
+  export type ConditionOperatorV2 =
+  'EQ' | 'NEQ' | 'GT' | 'GTE' | 'LT' | 'LTE' | 'INCLUDES';
+
+export type ConditionV2 =
+|{
     path: string;
-    op: 'EQ' | 'NEQ' | 'GT' | 'GTE' | 'LT' | 'LTE' | 'INCLUDES';
+    op: ConditionOperatorV2;
     value: string | number | boolean;
+} | {
+
+  left : ValueReferenceV2;
+   op: ConditionOperatorV2;
+   value :  string | number | boolean |  ValueReferenceV2;
+
+}| {
+    op: 'AND';
+    conditions: ConditionV2[];
+}| {
+    op: 'OR';
+    conditions: ConditionV2[];
+}|{
+   op: 'NOT';
+    condition: ConditionV2;
 };
 
 
@@ -115,6 +154,11 @@ export type EffectV2 =
       type: 'REMOVE';
       path: 'knowledge.knownFacts';
       value: string;
+    }
+    | {
+      type: 'SET_FROM';
+      path: string;
+      from: ValueReferenceV2;
     };
 
 export type TransitionV2 =
