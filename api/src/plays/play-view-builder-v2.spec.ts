@@ -191,4 +191,120 @@ describe('buildPlayViewV2', () => {
         expect(playData.scenarioState.knowledge.knownFacts)
             .toEqual(['alarm_heard']);
     });
+
+
+
+});
+
+describe('조건부 엔딩 서술', () => {
+    function createEndedPlay() {
+        const testScenario = structuredClone(scenario);
+        const playData = createInitialPlayDataV2(testScenario, 1, 0);
+
+        playData.state = 'CLEARED';
+        playData.endingId = 'TEST_END';
+
+        return { testScenario, playData };
+    }
+
+    it('일치하는 서술이 없으면 기본 설명을 반환한다', () => {
+        const { testScenario, playData } = createEndedPlay();
+
+        testScenario.endings[0].narratives = [
+            {
+                when: [
+                    {
+                        path: 'player.reported119',
+                        op: 'EQ',
+                        value: true,
+                    },
+                ],
+                text: '신고 후 구조되었습니다.',
+            },
+        ];
+
+        const view = buildPlayViewV2(playData, testScenario);
+
+        expect(view.ending?.description)
+            .toBe('상황이 종료되었습니다.');
+    });
+
+    it('일치하는 서술이 하나이면 해당 설명을 반환한다', () => {
+        const { testScenario, playData } = createEndedPlay();
+
+        testScenario.endings[0].narratives = [
+            {
+                when: [
+                    {
+                        path: 'player.reported119',
+                        op: 'EQ',
+                        value: false,
+                    },
+                ],
+                text: '신고하지 않은 상태에서 구조되었습니다.',
+            },
+        ];
+
+        const view = buildPlayViewV2(playData, testScenario);
+
+        expect(view.ending?.description)
+            .toBe('신고하지 않은 상태에서 구조되었습니다.');
+    });
+
+    it('일치하는 서술이 두 개 이상이면 거부한다', () => {
+        const { testScenario, playData } = createEndedPlay();
+
+        testScenario.endings[0].narratives = [
+            {
+                when: [],
+                text: '첫 번째 서술',
+            },
+            {
+                when: [],
+                text: '두 번째 서술',
+            },
+        ];
+
+        expect(() => buildPlayViewV2(playData, testScenario))
+            .toThrow('엔딩 TEST_END: 일치하는 서술 2개');
+    });
+
+    it('최종 플레이 상태에 따라 다른 서술을 반환한다', () => {
+        const { testScenario, playData } = createEndedPlay();
+
+        testScenario.endings[0].narratives = [
+            {
+                when: [
+                    {
+                        path: 'player.reported119',
+                        op: 'EQ',
+                        value: false,
+                    },
+                ],
+                text: '신고하지 않았습니다.',
+            },
+            {
+                when: [
+                    {
+                        path: 'player.reported119',
+                        op: 'EQ',
+                        value: true,
+                    },
+                ],
+                text: '신고했습니다.',
+            },
+        ];
+
+        const firstView = buildPlayViewV2(playData, testScenario);
+
+        expect(firstView.ending?.description)
+            .toBe('신고하지 않았습니다.');
+
+        playData.scenarioState.player.reported119 = true;
+
+        const secondView = buildPlayViewV2(playData, testScenario);
+
+        expect(secondView.ending?.description)
+            .toBe('신고했습니다.');
+    });
 });

@@ -52,6 +52,7 @@ export type EndingV2 = {
     title: string;
     description: string;
     requirements : ConditionV2[];
+    narratives?: NarrativeV2[];
 
 }
 

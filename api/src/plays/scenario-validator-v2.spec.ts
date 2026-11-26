@@ -20,7 +20,7 @@ describe('validateScenarioV2', () => {
         expect(() => validateScenarioV2(scenario)).not.toThrow();
     });
 
-    
+
     function loadTestScenario(): ScenarioV2 {
         return {
             schemaVersion: 2,
@@ -98,7 +98,11 @@ describe('validateScenarioV2', () => {
 
         validateScenarioV2(scenario);
 
-        scenario.scenes[0].actions[0].when[0].path = 'player.ggoggo';
+        scenario.scenes[0].actions[0].when[0] = {
+            path: 'player.ggoggo',
+            op: 'EQ',
+            value: false,
+        };
         expect(() => validateScenarioV2(scenario)).toThrow();
 
     });
@@ -114,12 +118,11 @@ describe('validateScenarioV2', () => {
             throw new Error('테스트할 effect가 없습니다.');
         }
 
-        // 기존 effect 값과 다른 자료형으로 변경
-        if (typeof effect.value === 'boolean') {
-            effect.value = 'invalid';
-        } else {
-            effect.value = false;
-        }
+        scenario.scenes[0].actions[0].outcomes[0].effects[0] = {
+            type: 'SET',
+            path: 'player.reported119',
+            value: 'invalid',
+        };
 
         expect(() => validateScenarioV2(scenario))
             .toThrow('값 형식이 다릅니다.');
@@ -496,7 +499,105 @@ describe('validateScenarioV2', () => {
     });
 
 
-    
+
+    describe('Ending narratives 검증', () => {
+        function createScenario(narratives: unknown) {
+            const scenario = loadTestScenario();
+
+            return {
+                ...scenario,
+                endings: [
+                    {
+                        ...scenario.endings[0],
+                        narratives,
+                    },
+                ],
+            };
+        }
+
+        it('정상적인 Ending narratives를 허용한다', () => {
+            const scenario = createScenario([
+                {
+                    when: [
+                        {
+                            path: 'player.reported119',
+                            op: 'EQ',
+                            value: true,
+                        },
+                    ],
+                    text: '신고 후 구조되었습니다.',
+                },
+            ]);
+
+            expect(() => validateScenarioV2(scenario))
+                .not.toThrow();
+        });
+
+        it('narratives가 배열이 아니면 거부한다', () => {
+            const scenario = createScenario('invalid');
+
+            expect(() => validateScenarioV2(scenario))
+                .toThrow('endings[0].narratives');
+        });
+
+        it('narratives가 빈 배열이면 거부한다', () => {
+            const scenario = createScenario([]);
+
+            expect(() => validateScenarioV2(scenario))
+                .toThrow('endings[0].narratives');
+        });
+
+        it('narrative가 객체가 아니면 거부한다', () => {
+            const scenario = createScenario([null]);
+
+            expect(() => validateScenarioV2(scenario))
+                .toThrow('endings[0].narratives[0]');
+        });
+
+        it('text가 빈 문자열이면 거부한다', () => {
+            const scenario = createScenario([
+                {
+                    when: [],
+                    text: '',
+                },
+            ]);
+
+            expect(() => validateScenarioV2(scenario))
+                .toThrow('endings[0].narratives[0].text');
+        });
+
+        it('when이 배열이 아니면 거부한다', () => {
+            const scenario = createScenario([
+                {
+                    when: 'invalid',
+                    text: '테스트 서술',
+                },
+            ]);
+
+            expect(() => validateScenarioV2(scenario))
+                .toThrow('endings[0].narratives[0].when');
+        });
+
+        it('존재하지 않는 상태 경로를 거부한다', () => {
+            const scenario = createScenario([
+                {
+                    when: [
+                        {
+                            path: 'player.notFound',
+                            op: 'EQ',
+                            value: true,
+                        },
+                    ],
+                    text: '테스트 서술',
+                },
+            ]);
+
+            expect(() => validateScenarioV2(scenario))
+                .toThrow();
+        });
+    });
+
+
     describe('timeline 검증', () => {
         function createScenario() {
             const scenario = loadTestScenario();

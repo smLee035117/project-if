@@ -9,6 +9,7 @@ import { getStateValue } from './state-access-v2.js';
 import {
     assertActionConditionVisibleV2,
 } from './state-engine-v2.js';
+import { isObject } from 'class-validator';
 
 // null과 배열을 제외한 객체인지 확인
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -76,8 +77,8 @@ function validateValueReference(
 }
 // 비어 있지 않은 문자열인지 확인
 function isNonEmptyString(value: unknown): value is string {
- 
- 
+
+
     return typeof value === "string" && value.trim().length > 0;
 }
 
@@ -646,6 +647,13 @@ if (value.timeEvents !== undefined) {
             throw new Error(`${label}.description이 올바르지 않습니다.`);
         }
 
+        validateNarratives(
+            ending.narratives,
+            label,
+            value.initialState,
+        );
+
+
         if (!Array.isArray(ending.requirements)) {
             throw new Error(`${label}.requirements는 배열이어야 합니다.`);
         }
@@ -684,7 +692,7 @@ if (value.timeEvents !== undefined) {
 
         sceneIds.add(scene.id);
 
-        
+
         if (
         scene.location !== undefined &&
         !isNonEmptyString(scene.location)
@@ -699,38 +707,11 @@ if (value.timeEvents !== undefined) {
         throw new Error(`${sceneLabel}.description이 올바르지 않습니다.`);
         }
 
-        if (scene.narratives !== undefined) {
-        if (
-            !Array.isArray(scene.narratives) ||
-            scene.narratives.length === 0
-        ) {
-            throw new Error(`${sceneLabel}.narratives가 올바르지 않습니다.`);
-        }
-
-        for (const [index, narrative] of scene.narratives.entries()) {
-            const label = `${sceneLabel}.narratives[${index}]`;
-
-            if (!isRecord(narrative)) {
-            throw new Error(`${label}는 객체여야 합니다.`);
-            }
-
-            if (!isNonEmptyString(narrative.text)) {
-            throw new Error(`${label}.text가 올바르지 않습니다.`);
-            }
-
-            if (!Array.isArray(narrative.when)) {
-            throw new Error(`${label}.when은 배열이어야 합니다.`);
-            }
-
-            for (const [i, condition] of narrative.when.entries()) {
-            validateCondition(
-                condition,
-                `${label}.when[${i}]`,
-                value.initialState,
-            );
-            }
-        }
-        }
+        validateNarratives(
+            scene.narratives,
+            sceneLabel,
+            value.initialState,
+        );
 
         if (
         !isNonEmptyString(scene.description) &&
@@ -745,10 +726,10 @@ if (value.timeEvents !== undefined) {
         }
 
         const actionIds = new Set<string>();
-        
+
         for (const [actionIndex, action] of scene.actions.entries()) {
              const actionLabel = `${sceneLabel}.actions[${actionIndex}]`;
-            
+
                  // id: string;
                 // text: string;
                 // when: ConditionV2;
@@ -756,7 +737,7 @@ if (value.timeEvents !== undefined) {
                 // durationMinutes: number;
                 // transition: TransitionV2;
 
-            
+
             if (!isRecord(action)) {
                 throw new Error(`${actionLabel}는 객체여야 합니다.`);
             }
@@ -809,11 +790,11 @@ if (value.timeEvents !== undefined) {
 
             //action.outcomes
             if (!Array.isArray(action.outcomes) || action.outcomes.length === 0) {
-                throw new Error(`${actionLabel}.outcomes 은 비어있지 않은 배열이어야 합니다.`);                
+                throw new Error(`${actionLabel}.outcomes 은 비어있지 않은 배열이어야 합니다.`);
             }
             for (const [outcomeIndex, outcome] of action.outcomes.entries()) {
-                const outcomeLabel = `${actionLabel}.outcomes[${outcomeIndex}]`; 
-                
+                const outcomeLabel = `${actionLabel}.outcomes[${outcomeIndex}]`;
+
                 if (!isRecord(outcome)) {
                     throw new Error(`${outcomeLabel}는 객체여야 합니다.`);
                 }
@@ -828,7 +809,7 @@ if (value.timeEvents !== undefined) {
                 }
 
                 for (const [outcomeCondiIndex, outcomeCondi] of outcome.when.entries()) {
-                    const outcomeCondiLabel = `${outcomeLabel}.when[${outcomeCondiIndex}]`; 
+                    const outcomeCondiLabel = `${outcomeLabel}.when[${outcomeCondiIndex}]`;
 
                     validateCondition (
                         outcomeCondi,
@@ -844,8 +825,8 @@ if (value.timeEvents !== undefined) {
                     throw new Error(`${outcomeLabel}.effects 은 배열이어야 합니다.`);
                 }
 
-                
-                
+
+
                 for (const [effectIndex, effect] of outcome.effects.entries()) {
                     validateEffect(
                         effect,
@@ -917,4 +898,47 @@ if (value.timeEvents !== undefined) {
     if (!exists) {
         throw new Error("initialSceneId에 해당하는 장면이 없습니다.");
     }
+}
+
+
+
+function validateNarratives(
+    narratives: unknown,
+    parentLabel: string,
+    initialState: ScenarioState,
+): void {
+
+    // 직접 구현
+    if(narratives === undefined) {
+        return ;
+    }
+
+    if ( !Array.isArray(narratives) || narratives.length === 0  ) {
+        throw new Error(`${parentLabel}.narratives가 올바르지 않습니다.`);
+    }
+
+    for (const [index, narrative] of narratives.entries()) {
+
+        const label = `${parentLabel}.narratives[${index}]`;
+
+        if(!isRecord(narrative)) {
+            throw new Error(`${label}는 객체여야 합니다.`);
+        }
+
+        if(!isNonEmptyString(narrative.text)) {
+            throw new Error(`${label}.text는 유효한 문자열이어야 합니다.`);
+        }
+
+        if(!Array.isArray(narrative.when)) {
+           throw new Error(`${label}.when는 유효한 문자열이어야 합니다.`);
+        }
+
+        for (const [i, condition] of narrative.when.entries()) {
+            const conditionLabel = `${label}.when[${i}]`;
+            validateCondition(condition,conditionLabel,initialState);
+        }
+
+    }
+
+
 }

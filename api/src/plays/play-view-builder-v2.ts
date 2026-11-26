@@ -1,6 +1,14 @@
 
-import type { PlayDataV2 , ScenarioState} from './types/play-v2.js';
-import type { ScenarioV2 , SceneV2 ,    ActionEvaluationContextV2,} from './types/scenario-v2.js';
+import type {
+    PlayDataV2 ,
+     ScenarioState
+} from './types/play-v2.js';
+import type {
+    ScenarioV2,
+    SceneV2,
+    EndingV2,
+    ActionEvaluationContextV2,
+} from './types/scenario-v2.js';
 import type {
     PlayViewV2,
     PlayActionViewV2,
@@ -75,7 +83,10 @@ export function buildPlayViewV2(
         ending = {
             id: found.id,
             title: found.title,
-            description: found.description,
+            description: resolveEndingDescription(
+                found,
+                playData.scenarioState,
+            ),
         };
     }
 
@@ -139,5 +150,30 @@ function resolveSceneDescription(
 
 
 
+
+}
+
+function resolveEndingDescription(
+    ending: EndingV2,
+    state: ScenarioState,
+): string {
+    // 직접 구현
+
+    const matchedNarratives = ending.narratives?.filter(
+        (narrative) => evaluateConditions(state, narrative.when),
+    );
+
+    if (matchedNarratives === undefined || matchedNarratives.length === 0 ) {
+        // 기본값 반환
+        return ending.description;
+
+    } else if (matchedNarratives.length === 1) {
+        // 값 반환
+        return matchedNarratives[0].text;
+
+    } else {
+        //에러
+        throw new Error(`엔딩 ${ending.id}: 일치하는 서술 ${matchedNarratives.length}개`);
+    }
 
 }
