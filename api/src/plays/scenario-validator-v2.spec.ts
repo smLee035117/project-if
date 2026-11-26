@@ -597,6 +597,99 @@ describe('validateScenarioV2', () => {
         });
     });
 
+    describe('시간 정밀도 검증', () => {
+        it('소수점 둘째 자리까지의 행동 시간을 허용한다', () => {
+            const scenario = loadTestScenario();
+
+            scenario.scenes[0].actions[0].durationMinutes = 0.35;
+
+            expect(() => validateScenarioV2(scenario))
+                .not.toThrow();
+        });
+
+        it('소수점 셋째 자리 이상의 행동 시간을 거부한다', () => {
+            const scenario = loadTestScenario();
+
+            scenario.scenes[0].actions[0].durationMinutes = 0.123;
+
+            expect(() => validateScenarioV2(scenario))
+                .toThrow('durationMinutes가 올바르지 않습니다.');
+        });
+
+        it('0분의 행동 시간을 허용한다', () => {
+            const scenario = loadTestScenario();
+
+            scenario.scenes[0].actions[0].durationMinutes = 0;
+
+            expect(() => validateScenarioV2(scenario))
+                .not.toThrow();
+        });
+
+        it('소수점 셋째 자리 이상의 TimeEvent 시각을 거부한다', () => {
+            const scenario = createTimeEventScenario();
+
+            scenario.timeEvents![0].atMinute = 3.125;
+
+            expect(() => validateScenarioV2(scenario))
+                .toThrow('atMinute가 올바르지 않습니다.');
+        });
+
+        it('소수점 셋째 자리 이상의 절대 Timeline 시각을 거부한다', () => {
+            const scenario = loadTestScenario();
+
+            scenario.timeline = [
+                {
+                    eventId: 'PRECISION_TEST',
+                    description: '시간 정밀도 테스트',
+                    atMinute: 3.125,
+                    when: [],
+                    effects: [
+                        {
+                            type: 'SET',
+                            path: 'world.insideSmoke',
+                            value: true,
+                        },
+                    ],
+                },
+            ];
+
+            expect(() => validateScenarioV2(scenario))
+                .toThrow('atMinute가 올바르지 않습니다.');
+        });
+
+        it('소수점 셋째 자리 이상의 상대 Timeline 시간을 거부한다', () => {
+            const scenario = loadTestScenario();
+
+            scenario.timeline = [
+                {
+                    eventId: 'RELATIVE_PRECISION_TEST',
+                    description: '상대 시간 정밀도 테스트',
+                    after: {
+                        trigger: 'WHEN_BECOMES_TRUE',
+                        delayMinutes: 0.001,
+                        when: [
+                            {
+                                path: 'player.reported119',
+                                op: 'EQ',
+                                value: true,
+                            },
+                        ],
+                    },
+                    effects: [
+                        {
+                            type: 'SET',
+                            path: 'world.insideSmoke',
+                            value: true,
+                        },
+                    ],
+                },
+            ];
+
+            expect(() => validateScenarioV2(scenario))
+                .toThrow('delayMinutes가 올바르지 않습니다.');
+        });
+    });
+
 
     describe('timeline 검증', () => {
         function createScenario() {

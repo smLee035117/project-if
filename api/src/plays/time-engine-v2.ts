@@ -8,6 +8,17 @@ import {
     evaluateConditions,
 } from './state-engine-v2.js';
 
+function addMinutes(
+    currentMinute: number,
+    additionalMinutes: number,
+): number {
+    // 직접 구현
+    return Number(
+        (currentMinute + additionalMinutes).toFixed(2),
+    );
+
+}
+
 export function advanceTimeV2(
     state: ScenarioState,
     startMinute: number,
@@ -27,7 +38,7 @@ export function advanceTimeV2(
         throw new Error('시간 값이 올바르지 않습니다.');
     }
 
-    const endMinute = startMinute + durationMinutes;
+    const endMinute = addMinutes(startMinute, durationMinutes);
 
     if (!Number.isFinite(endMinute)) {
         throw new Error('종료 시각이 올바르지 않습니다.');
@@ -110,7 +121,9 @@ export function scheduleRelativeEventsV2(
             evaluateConditions(afterState, checkTimeline.after.when)) {
                 
                 nextProgress.pending[checkTimeline.eventId] = 
-                    currentMinute + checkTimeline.after.delayMinutes;
+                    addMinutes(
+                        currentMinute, checkTimeline.after.delayMinutes
+                    );
 
         }
 

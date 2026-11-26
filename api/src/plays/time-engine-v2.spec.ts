@@ -110,6 +110,47 @@ describe('advanceTimeV2', () => {
         expect(result.scenarioState.world.dangerLevel).toBe(10);
     });
 
+    it('소수점 시간 계산 결과를 정확하게 유지한다', () => {
+        const result = advanceTimeV2(
+            createState(),
+            0.7,
+            0.1,
+            [],
+        );
+
+        expect(result.endMinute).toBe(0.8);
+    });
+
+    it('소수점 종료 시각에 도달하면 이벤트를 실행한다', () => {
+        const events: TimeEventV2[] = [
+            {
+                id: 'DECIMAL_BOUNDARY',
+                atMinute: 0.8,
+                when: [],
+                effects: [
+                    {
+                        type: 'SET',
+                        path: 'world.corridorSmoke',
+                        value: true,
+                    },
+                ],
+            },
+        ];
+
+        const result = advanceTimeV2(
+            createState(),
+            0.7,
+            0.1,
+            events,
+        );
+
+        expect(result.scenarioState.world.corridorSmoke)
+            .toBe(true);
+
+        expect(result.handledEventIds)
+            .toEqual(['DECIMAL_BOUNDARY']);
+    });
+
     it('이벤트 적용 중 오류가 발생해도 원본은 유지한다', () => {
         const original = createState();
 
@@ -235,6 +276,59 @@ test('상대 시간 이벤트를 최초 상태 전이 시 예약한다', () => {
 });
 
 
+test('상대 시간 이벤트의 예약 시각을 정확하게 유지한다', () => {
+    const beforeState: ScenarioState = {
+        world: {},
+        player: { reported119: false },
+        knowledge: { knownFacts: [] },
+    };
+
+    const afterState: ScenarioState = {
+        world: {},
+        player: { reported119: true },
+        knowledge: { knownFacts: [] },
+    };
+
+    const timeline: TimelineEventV2[] = [
+        {
+            eventId: 'DECIMAL_RESCUE',
+            description: '소수점 시간 예약 테스트',
+            after: {
+                trigger: 'WHEN_BECOMES_TRUE',
+                delayMinutes: 0.1,
+                when: [
+                    {
+                        path: 'player.reported119',
+                        op: 'EQ',
+                        value: true,
+                    },
+                ],
+            },
+            effects: [
+                {
+                    type: 'SET',
+                    path: 'player.reported119',
+                    value: true,
+                },
+            ],
+        },
+    ];
+
+    const progress: TimelineProgressV2 = {
+        pending: {},
+        processed: [],
+    };
+
+    const result = scheduleRelativeEventsV2(
+        beforeState,
+        afterState,
+        0.7,
+        timeline,
+        progress,
+    );
+
+    expect(result.pending.DECIMAL_RESCUE).toBe(0.8);
+});
 
 describe('buildScheduledTimeEventsV2', () => {
     const timeline: TimelineEventV2[] = [

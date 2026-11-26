@@ -82,6 +82,10 @@ function isNonEmptyString(value: unknown): value is string {
     return typeof value === "string" && value.trim().length > 0;
 }
 
+function hasValidTimePrecision(value: number): boolean {
+    return Number(value.toFixed(2)) === value;
+}
+
 
 function isStateValue(
     value: unknown,
@@ -480,7 +484,8 @@ export function validateScenarioV2(value: unknown): asserts value is ScenarioV2 
                 if (
                     typeof event.atMinute !== 'number' ||
                     !Number.isFinite(event.atMinute) ||
-                    event.atMinute <= 0
+                    event.atMinute <= 0 ||
+                    !hasValidTimePrecision(event.atMinute)
                 ) {
                     throw new Error(`${label}.atMinute가 올바르지 않습니다.`);
                 }
@@ -498,7 +503,8 @@ export function validateScenarioV2(value: unknown): asserts value is ScenarioV2 
                 if (
                     typeof event.after.delayMinutes !== 'number' ||
                     !Number.isFinite(event.after.delayMinutes) ||
-                    event.after.delayMinutes <= 0
+                    event.after.delayMinutes <= 0 ||
+                    !hasValidTimePrecision(event.after.delayMinutes)
                 ) {
                     throw new Error(`${label}.after.delayMinutes가 올바르지 않습니다.`);
                 }
@@ -569,7 +575,8 @@ if (value.timeEvents !== undefined) {
             if (
                 typeof event.atMinute !== 'number' ||
                 !Number.isFinite(event.atMinute) ||
-                event.atMinute <= 0
+                event.atMinute <= 0 ||
+                !hasValidTimePrecision(event.atMinute)
             ) {
                 throw new Error(`${label}.atMinute가 올바르지 않습니다.`);
             }
@@ -760,7 +767,8 @@ if (value.timeEvents !== undefined) {
             if (
                 typeof action.durationMinutes !== 'number' ||
                 !Number.isFinite(action.durationMinutes) ||
-                action.durationMinutes < 0
+                action.durationMinutes < 0 ||
+                !hasValidTimePrecision(action.durationMinutes)
             ) {
                 throw new Error(`${actionLabel}.durationMinutes가 올바르지 않습니다.`);
             }
