@@ -1,11 +1,12 @@
 import {
-  Controller,
-  Get,
-  Post,
-  Body,
-  Param,
-  Req,
-  Res,
+    Controller,
+    Get,
+    Post,
+    Body,
+    Param,
+    Req,
+    Res,
+    NotFoundException,
 } from '@nestjs/common';
 
 import type { Request, Response } from 'express';
@@ -18,6 +19,9 @@ import type { PlayViewV2 } from './types/play-view-v2.js';
 import { HttpCode } from '@nestjs/common';
 import { SubmitActionV2Dto } from './dto/submit-action-v2.dto.js';
 
+import { isScenarioPublishedV2 } from './scenario-registry-v2.js';
+
+import { isLoopbackRequest } from './local-request.js';
 
 
 @Controller('v2/plays')
@@ -35,6 +39,33 @@ export class PlaysV2Controller {
     playId: string;
     view: PlayViewV2;
   }> {
+
+
+    const isDevelopment = process.env.NODE_ENV === 'development';
+    const isTest = process.env.NODE_ENV === 'test';
+    const isPublished = isScenarioPublishedV2(body.scenarioId);
+
+    const clientIp = request.ip ?? request.socket.remoteAddress ?? '';
+
+    const  isLoopback = isLoopbackRequest(request);
+
+    const canAccessUnpublished =
+        (isDevelopment && isLoopback) || isTest;
+
+
+    if (!canAccessUnpublished && !isPublished ) {
+        throw new NotFoundException();
+    }
+
+
+    if (
+        process.env.NODE_ENV === 'production' &&
+        !isScenarioPublishedV2(body.scenarioId)
+    ) {
+        throw new NotFoundException();
+    }
+
+
     const token: unknown =
       request.cookies?.guest_token;
 

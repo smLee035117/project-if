@@ -8,10 +8,11 @@ import { RedisModule } from '../redis/redis.module.js';
 
 import { PlaysV2Controller } from './plays-v2.controller.js';
 import { DevPlaygroundController } from './dev-playground.controller.js';
+import { ScenariosV2Controller } from './scenarios-v2.controller.js';
 
 @Module({
   imports: [DatabaseModule , RedisModule],
-  controllers: [PlaysController, PlaysV2Controller, DevPlaygroundController,],
+    controllers: [PlaysController, PlaysV2Controller, DevPlaygroundController, ScenariosV2Controller,],
   providers: [PlaysService,PlayRecoveryBootstrapService]
 })
 export class PlaysModule {}

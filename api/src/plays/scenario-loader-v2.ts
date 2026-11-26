@@ -6,23 +6,45 @@ import type { ScenarioV2 } from './types/scenario-v2.js';
 import { validateScenarioV2 } from './scenario-validator-v2.js';
 import { ScenarioNotFoundError } from './scenario-loader.js';
 
-const scenarioFiles: Record<string, string> = {
-  apartment_fire_01: 'apartment_fire_01.json',
-  blackout_resource_01: 'blackout_resource_01.json',
-  lost_hiking_01: 'lost_hiking_01.json',
-  basement_flood_01: 'basement_flood_01.json',
-  office_fire_01: 'office_fire_01.json',
-};
+import { scenarioRegistry } from './scenario-registry-v2.js';
+
+export interface ScenarioSummaryV2 {
+    scenarioId: string;
+    title: string;
+    version: string;
+}
+
+export async function listScenariosV2(
+    includeUnpublished: boolean = false,
+): Promise<ScenarioSummaryV2[]> {
+
+    const publishedEntries = Object.entries(scenarioRegistry)
+        .filter(([, registration]) => includeUnpublished || registration.published);
+
+    const result = publishedEntries.map(async ([id]) => {
+
+        const scenario = await loadScenarioV2(id);
+
+        return {
+            scenarioId: scenario.scenarioId,
+            title: scenario.title,
+            version: scenario.version,
+        };
+
+    });
+
+    return await Promise.all(result);
+}
 
 export async function loadScenarioV2(
     scenarioId: string,
 ): Promise<ScenarioV2> {
 
-    if (!Object.hasOwn(scenarioFiles, scenarioId)) {
+    if (!Object.hasOwn(scenarioRegistry, scenarioId)) {
         throw new ScenarioNotFoundError(scenarioId);
     }
 
-    const fileName = scenarioFiles[scenarioId];
+    const fileName = scenarioRegistry[scenarioId]?.fileName;
 
     if (!fileName) {
         throw new Error(`시나리오 파일 경로가 없습니다: ${scenarioId}`);

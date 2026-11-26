@@ -12,22 +12,39 @@ import { resolve } from 'node:path';
 import type { Request, Response } from 'express';
 import { PlaysService } from './plays.service.js';
 
+
+import {
+    listScenariosV2,
+    type ScenarioSummaryV2,
+} from './scenario-loader-v2.js';
+
+import { isLoopbackRequest } from './local-request.js';
+
+
+
 @Controller('dev')
 export class DevPlaygroundController {
   constructor(private readonly playsService: PlaysService) {}
 
-  private assertLocalDevelopment(request: Request): void {
-    const clientIp = request.ip ?? request.socket.remoteAddress ?? '';
-    const isLoopback = [
-      '127.0.0.1',
-      '::1',
-      '::ffff:127.0.0.1',
-    ].includes(clientIp);
+    private assertLocalDevelopment(request: Request): void {
+        const isLoopback = isLoopbackRequest(request);
 
-    if (process.env.NODE_ENV !== 'development' || !isLoopback) {
-      throw new NotFoundException();
+        if (process.env.NODE_ENV !== 'development' || !isLoopback) {
+            throw new NotFoundException();
+        }
     }
-  }
+
+
+
+    @Get('scenarios')
+    async getScenarios(
+        @Req() request: Request,
+    ): Promise<ScenarioSummaryV2[]> {
+
+        this.assertLocalDevelopment(request);
+
+        return await listScenariosV2(true);
+    }
 
   @Get('playground')
   async getPlayground(

@@ -40,12 +40,8 @@
   <header>
     <div><h1>Project IF</h1><small>V2 플레이그라운드 · 실제 API 연결 · 로컬 개발 전용</small></div>
     <div class="tools">
-      <select id="scenario" aria-label="시나리오 선택">
-        <option value="apartment_fire_01">화재 · 경보가 울린 밤</option>
-        <option value="blackout_resource_01">정전</option>
-        <option value="lost_hiking_01">조난</option>
-        <option value="basement_flood_01">침수</option>
-        <option value="office_fire_01">화재 · 퇴근하겠습니다</option>
+      <select id="scenario" aria-label="시나리오 선택" disabled>
+        <option value="">시나리오 불러오는 중...</option>
       </select>
       <button id="start" class="primary">새 플레이 시작</button>
     </div>
@@ -88,8 +84,8 @@
     el('version').textContent = 'v' + String(view?.version ?? 0);
     el('scene-id').textContent = view?.currentSceneId ? '장면 · ' + view.currentSceneId : '장면 없음';
     el('scene-text').textContent = view?.sceneDescription ?? '위의 새 플레이 시작을 누르세요.';
-    el('start').disabled = busy;
-    el('scenario').disabled = busy;
+    el('start').disabled = busy || !el('scenario').value;
+    el('scenario').disabled = busy || !el('scenario').value;
     el('refresh').disabled = busy || !playId;
     renderHistory();
     const container = el('actions');
@@ -196,6 +192,36 @@
     } finally { busy = false; render(); }
   }
 
+
+  async function loadScenarios() {
+    await execute(async () => {
+        const scenarios = await callApi('GET', '/dev/scenarios');
+
+        const select = el('scenario');
+
+        select.replaceChildren();
+
+        if (scenarios.length === 0) {
+            const option = document.createElement('option');
+
+            option.value = '';
+            option.textContent = '공개된 시나리오가 없습니다.';
+
+            select.appendChild(option);
+            return;
+        }
+
+        for (const scenario of scenarios) {
+            const option = document.createElement('option');
+
+            option.value = scenario.scenarioId;
+            option.textContent = scenario.title;
+
+            select.appendChild(option);
+        }
+    });
+  }
+
   async function start() {
   await execute(async () => {
     playId = null;
@@ -238,6 +264,7 @@
     await debugRefresh();
   }));
   render();
+  loadScenarios();
 })();
 </script>
 </body>

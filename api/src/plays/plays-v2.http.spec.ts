@@ -8,13 +8,14 @@ import request from 'supertest';
 import cookieParser from 'cookie-parser';
 
 import {
-  describe,
-  it,
-  expect,
-  beforeAll,
-  afterAll,
-  beforeEach,
-  vi,
+    describe,
+    it,
+    expect,
+    beforeAll,
+    afterAll,
+    beforeEach,
+    afterEach,
+    vi,
 } from 'vitest';
 
 import { PlaysV2Controller } from './plays-v2.controller.js';
@@ -24,6 +25,12 @@ import { DatabaseService } from '../database/database.service.js';
 import { RedisService } from '../redis/redis.service.js';
 
 import { loadScenarioV2 } from './scenario-loader-v2.js';
+
+import { isLoopbackRequest } from './local-request.js';
+
+vi.mock('./local-request.js', () => ({
+    isLoopbackRequest: vi.fn(),
+}));
 
 // Keep HTTP contracts independent of frequently revised narrative JSON.
 vi.mock('./scenario-loader-v2.js', async (importOriginal) => {
@@ -438,5 +445,75 @@ describe('Plays V2 HTTP', () => {
 
     expect(redisMock.updatePlayV2IfVersion)
         .not.toHaveBeenCalled();
+    });
+
+
+    describe('시나리오 공개 정책', () => {
+
+        afterEach(() => {
+            vi.unstubAllEnvs();
+        });
+
+        it.each([
+            ['production', true, 404],
+            ['production', false, 404],
+            ['development', true, 201],
+            ['development', false, 404],
+            ['test', true, 201],
+            ['test', false, 201],
+            [undefined, true, 404],
+            ['unknown', true, 404],
+        ] as const)(
+            '환경=%s, 로컬 접속=%s → 비공개 시나리오 응답 %s',
+            async (environment, isLoopback, expectedStatus) => {
+
+                vi.stubEnv('NODE_ENV', environment);
+
+                vi.mocked(isLoopbackRequest)
+                    .mockReturnValue(isLoopback);
+
+                const response = await request(app.getHttpServer())
+                    .post('/v2/plays')
+                    .send({
+                        scenarioId: 'apartment_fire_01',
+                    });
+
+                expect(response.status).toBe(expectedStatus);
+
+                if (expectedStatus === 404) {
+                    expect(databaseMock.createGuestWithSession)
+                        .not.toHaveBeenCalled();
+
+                    expect(redisMock.savePlayV2)
+                        .not.toHaveBeenCalled();
+                } else {
+                    expect(redisMock.savePlayV2)
+                        .toHaveBeenCalledTimes(1);
+                }
+            },
+        );
+
+        it('운영 환경에서도 공개 시나리오는 시작할 수 있다', async () => {
+
+            vi.stubEnv('NODE_ENV', 'production');
+
+            vi.mocked(isLoopbackRequest)
+                .mockReturnValue(false);
+
+            const response = await request(app.getHttpServer())
+                .post('/v2/plays')
+                .send({
+                    scenarioId: 'office_fire_01',
+                });
+
+            expect(response.status).toBe(201);
+
+            expect(response.body.view.scenarioId)
+                .toBe('office_fire_01');
+
+            expect(redisMock.savePlayV2)
+                .toHaveBeenCalledTimes(1);
+        });
+
     });
 });
