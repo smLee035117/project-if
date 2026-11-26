@@ -26,6 +26,7 @@ describe('loadScenarioV2', () => {
     'blackout_resource_01',
     'lost_hiking_01',
     'basement_flood_01',
+        'office_fire_01',
     ])('%s 시나리오를 로딩하고 초기 장면을 구성한다', async (scenarioId) => {
     const scenario = await loadScenarioV2(scenarioId);
 

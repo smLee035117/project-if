@@ -11,6 +11,7 @@ const scenarioFiles: Record<string, string> = {
   blackout_resource_01: 'blackout_resource_01.json',
   lost_hiking_01: 'lost_hiking_01.json',
   basement_flood_01: 'basement_flood_01.json',
+  office_fire_01: 'office_fire_01.json',
 };
 
 export async function loadScenarioV2(
