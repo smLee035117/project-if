@@ -143,7 +143,6 @@ describe('PlaysService', () => {
 
 
   test('MySQL 저장 성공 후 pending 삭제가 호출된다', async () => {
-      // 직접 구현
 
        const playData = createInitialPlayData(
             'blackout_test_01',

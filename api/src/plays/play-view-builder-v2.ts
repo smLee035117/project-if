@@ -157,7 +157,7 @@ function resolveEndingDescription(
     ending: EndingV2,
     state: ScenarioState,
 ): string {
-    // 직접 구현
+
 
     const matchedNarratives = ending.narratives?.filter(
         (narrative) => evaluateConditions(state, narrative.when),

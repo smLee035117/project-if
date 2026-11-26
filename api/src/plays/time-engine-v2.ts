@@ -12,7 +12,6 @@ function addMinutes(
     currentMinute: number,
     additionalMinutes: number,
 ): number {
-    // 직접 구현
     return Number(
         (currentMinute + additionalMinutes).toFixed(2),
     );

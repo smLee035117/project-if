@@ -915,8 +915,6 @@ function validateNarratives(
     parentLabel: string,
     initialState: ScenarioState,
 ): void {
-
-    // 직접 구현
     if(narratives === undefined) {
         return ;
     }

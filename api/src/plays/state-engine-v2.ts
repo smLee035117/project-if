@@ -114,10 +114,6 @@ export function resolveValueReferenceV2(
     context: ActionEvaluationContextV2,
 ): string | number | boolean | string[] {
 
-    // 직접 구현
-
-
-
 
 
     switch(reference.kind) {
