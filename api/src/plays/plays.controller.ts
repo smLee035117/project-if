@@ -7,6 +7,7 @@ import { SubmitChoiceDto } from './dto/submit-choice.dto.js';
 import type { Request, Response } from 'express';
 import { PlayData } from './types/play.js';
 
+import { GUEST_SESSION_TTL_MS } from '../config/session-policy.js';
 
 
 
@@ -50,7 +51,7 @@ export class PlaysController {
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
             sameSite: 'lax',
-            maxAge: 30 * 24 * 60 * 60 * 1000,
+                maxAge: GUEST_SESSION_TTL_MS,
             path: '/',
             });
         }

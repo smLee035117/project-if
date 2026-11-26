@@ -1,0 +1,2 @@
+export const GUEST_SESSION_TTL_DAYS = 7;
+export const GUEST_SESSION_TTL_MS = GUEST_SESSION_TTL_DAYS * 24 * 60 * 60 * 1000;

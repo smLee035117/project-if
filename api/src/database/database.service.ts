@@ -9,6 +9,8 @@ import type { PlayDataV2 } from '../plays/types/play-v2.js';
 
 import { isDeepStrictEqual } from 'node:util';
 
+import { GUEST_SESSION_TTL_DAYS } from '../config/session-policy.js';
+
 interface GuestSessionRow extends RowDataPacket {
   user_no: number;
 }
@@ -101,8 +103,8 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy  {
             await connection.execute(
             `INSERT INTO guest_sessions
             (token_hash, user_no, expires_at)
-            VALUES (?, ?, DATE_ADD(UTC_TIMESTAMP(), INTERVAL 30 DAY))`,
-            [tokenHash, result.insertId],
+                VALUES (?, ?, DATE_ADD(UTC_TIMESTAMP(), INTERVAL ? DAY))`,
+                [tokenHash, result.insertId, GUEST_SESSION_TTL_DAYS],
             );
 
             await connection.commit();

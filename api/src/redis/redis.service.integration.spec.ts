@@ -76,9 +76,9 @@ test('이전 단계 기준의 저장 요청은 기존 결과를 덮어쓰지 않
 
   await service.savePlay(playId, initial);
 
-  
+
   const resA = await service.updatePlayIfCurrent(playId,0,resultA);
-  expect(resA).toBe(true);  
+  expect(resA).toBe(true);
 
   const resB = await service.updatePlayIfCurrent(playId,0,resultB);
   expect(resB).toBe(false);
@@ -86,7 +86,7 @@ test('이전 단계 기준의 저장 요청은 기존 결과를 덮어쓰지 않
 
   const getResA = await service.getPlay(playId);
   expect(getResA).toEqual(resultA);
-  
+
 });
 
 
@@ -125,7 +125,7 @@ test('동시 저장 요청 중 하나만 성공한다', async () => {
     service.updatePlayIfCurrent(playId, 0, resultB),
   ]);
 
-  const isXor: boolean = resA !== resB; 
+  const isXor: boolean = resA !== resB;
 
   expect(isXor).toBe(true);
 
@@ -136,7 +136,7 @@ test('동시 저장 요청 중 하나만 성공한다', async () => {
 });
 
 test('종료 상태로 갱신하면 pending 결과도 저장된다', async () => {
-  
+
     const playId = `test-${randomUUID()}`;
     playIds.push(playId);
 
@@ -152,7 +152,7 @@ test('종료 상태로 갱신하면 pending 결과도 저장된다', async () =>
     const resultA: PlayData = {
       ...initial,
       state: 'CLEARED',
-    
+
     };
 
      await service.savePlay(playId, initial);
@@ -163,7 +163,7 @@ test('종료 상태로 갱신하면 pending 결과도 저장된다', async () =>
 
      const getRes = await service.getPlay(playId);
 
-    const pending = await cleanupClient.get(`pending:play-result:${playId}`);     
+    const pending = await cleanupClient.get(`pending:play-result:${playId}`);
     expect(pending).not.toBeNull();
 
     expect(getRes).toEqual(resultA);
@@ -172,27 +172,6 @@ test('종료 상태로 갱신하면 pending 결과도 저장된다', async () =>
 });
 
 test('CAS 검증에 실패하면 pending 결과를 저장하지 않는다', async () => {
-  // 직접 구현
-
-   // 1. playId 생성 및 정리 목록 등록
-
-    // 2. 초기 PlayData 구성 (currentStep: 0)
-
-    // 3. 종료 상태의 resultA 구성 (state: CLEARED)
-
-    // 4. Redis에 initial 저장
-
-    // 5. expectedStep을 1로 설정해 CAS 요청
-
-    // 6. CAS 반환값이 false인지 검증
-
-    // 7. Redis의 플레이 데이터를 다시 조회
-
-    // 8. 조회 결과가 initial과 동일한지 검증
-
-    // 9. pending 키 조회
-
-    // 10. pending 데이터가 null인지 검증
 
     const playId = `test-${randomUUID()}`;
     playIds.push(playId);
@@ -210,7 +189,7 @@ test('CAS 검증에 실패하면 pending 결과를 저장하지 않는다', asyn
     const resultA: PlayData = {
       ...initial,
       state: 'CLEARED',
-    
+
     };
 
      await service.savePlay(playId, initial);
@@ -224,7 +203,7 @@ test('CAS 검증에 실패하면 pending 결과를 저장하지 않는다', asyn
 
      expect(getRes).toEqual(initial);
 
-     const pending = await cleanupClient.get(`pending:play-result:${playId}`);     
+     const pending = await cleanupClient.get(`pending:play-result:${playId}`);
     expect(pending).toBeNull();
 
 
@@ -232,7 +211,6 @@ test('CAS 검증에 실패하면 pending 결과를 저장하지 않는다', asyn
 
 
 test('pending 결과를 조회하고 삭제 후에는 null을 반환한다', async () => {
-  // 직접 구현
     const playId = `test-${randomUUID()}`;
       playIds.push(playId);
 
@@ -249,7 +227,7 @@ test('pending 결과를 조회하고 삭제 후에는 null을 반환한다', asy
       const resultA: PlayData = {
         ...initial,
         state: 'CLEARED',
-      
+
       };
 
       await service.savePlay(playId, initial);
@@ -260,10 +238,10 @@ test('pending 결과를 조회하고 삭제 후에는 null을 반환한다', asy
       const chk = await service.getPendingPlayResult(playId);
       expect(chk).toEqual(resultA);
 
-      const pending = await cleanupClient.get(`pending:play-result:${playId}`);    
+      const pending = await cleanupClient.get(`pending:play-result:${playId}`);
       expect(pending).not.toBeNull();
       await service.deletePendingPlayResult(playId);
-      
+
       const pendingAfter = await cleanupClient.get(`pending:play-result:${playId}`);
       expect(pendingAfter).toBeNull();
 
@@ -310,14 +288,12 @@ test('GIVEN_UP 상태에서는 pending 결과를 생성하지 않는다', async 
         );
 
         // 6. CAS 성공 검증
-        // 직접 구현
         expect(updated).toBe(true);
 
         // 7. Redis 플레이 상태가 GIVEN_UP으로 변경됐는지 검증
-        // 직접 구현
         expect(await service.getPlay(playId)).toEqual(givenUpData);
+
         // 8. pending이 생성되지 않았는지 검증
-        // 직접 구현
         expect(await service.getPendingPlayResult(playId)).toBeNull();
 
 
@@ -347,7 +323,7 @@ test('GIVEN_UP 상태에서는 pending 결과를 생성하지 않는다', async 
         // TTL이 설정되었는지 검증
         const ttl = await cleanupClient.ttl(`play:v2:${playId}`);
 
-        expect(ttl).toBeGreaterThan(0);
+        expect(ttl).toBeGreaterThan(3595);
         expect(ttl).toBeLessThanOrEqual(3600);
     });
 
@@ -642,3 +618,122 @@ test('GIVEN_UP 상태에서는 pending 결과를 생성하지 않는다', async 
           ),
       ).toBeNull();
   });
+
+
+test('V2 행동 성공 시 플레이 TTL이 1시간으로 갱신된다', async () => {
+
+    const playId = `test-${randomUUID()}`;
+    playIds.push(playId);
+
+    const key = `play:v2:${playId}`;
+    const scenario = createV2TestScenario();
+    const initial = createInitialPlayDataV2(scenario, 4, 0);
+
+    const next = executeActionV2(
+        initial, scenario, 'E01-A',
+    ).playData;
+
+    await service.savePlayV2(playId, initial);
+
+    await cleanupClient.expire(key, 60);
+
+    expect(await service.updatePlayV2IfVersion(
+        playId, 0, next,
+    )).toBe(true);
+
+    const ttl = await cleanupClient.ttl(key);
+
+    expect(ttl).toBeGreaterThanOrEqual(3595);
+    expect(ttl).toBeLessThanOrEqual(3600);
+});
+
+
+test('V2 플레이를 조회해도 TTL은 갱신되지 않는다', async () => {
+
+    const playId = `test-${randomUUID()}`;
+    playIds.push(playId);
+
+    const key = `play:v2:${playId}`;
+    const scenario = createV2TestScenario();
+    const initial = createInitialPlayDataV2(scenario, 4, 0);
+
+    await service.savePlayV2(playId, initial);
+
+    await cleanupClient.expire(key, 60);
+
+    const beforeTTL = await cleanupClient.ttl(key);
+
+    expect(await service.getPlayV2(playId))
+        .toEqual(initial);
+
+    const afterTTL = await cleanupClient.ttl(key);
+
+    expect(afterTTL).toBeGreaterThan(0);
+    expect(afterTTL).toBeLessThanOrEqual(beforeTTL);
+});
+
+
+test('V2 CAS 버전 충돌 시 TTL은 갱신되지 않는다', async () => {
+
+    const playId = `test-${randomUUID()}`;
+    playIds.push(playId);
+
+    const key = `play:v2:${playId}`;
+    const scenario = createV2TestScenario();
+    const initial = createInitialPlayDataV2(scenario, 4, 0);
+
+    const next = {
+        ...initial,
+        version: 2,
+    };
+
+    await service.savePlayV2(playId, initial);
+
+    await cleanupClient.expire(key, 60);
+
+    const beforeTTL = await cleanupClient.ttl(key);
+
+    expect(await service.updatePlayV2IfVersion(
+        playId, 1, next,
+    )).toBe(false);
+
+    const afterTTL = await cleanupClient.ttl(key);
+
+    expect(afterTTL).toBeGreaterThan(0);
+    expect(afterTTL).toBeLessThanOrEqual(beforeTTL);
+
+    expect(await service.getPlayV2(playId))
+        .toEqual(initial);
+});
+
+
+test('만료된 V2 플레이는 CAS 요청으로 복원되지 않는다', async () => {
+
+    const playId = `test-${randomUUID()}`;
+    playIds.push(playId);
+
+    const key = `play:v2:${playId}`;
+    const scenario = createV2TestScenario();
+    const initial = createInitialPlayDataV2(scenario, 4, 0);
+
+    const next = executeActionV2(
+        initial, scenario, 'E01-A',
+    ).playData;
+
+    await service.savePlayV2(playId, initial);
+
+    await cleanupClient.expire(key, 0);
+
+    expect(await service.getPlayV2(playId))
+        .toBeNull();
+
+    expect(await service.updatePlayV2IfVersion(
+        playId, 0, next,
+    )).toBe(false);
+
+    expect(await service.getPlayV2(playId))
+        .toBeNull();
+
+    expect(await cleanupClient.ttl(key))
+        .toBe(-2);
+});

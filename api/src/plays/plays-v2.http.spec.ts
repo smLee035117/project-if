@@ -152,6 +152,9 @@ describe('Plays V2 HTTP', () => {
 
     expect(JSON.stringify(cookies))
       .toContain('HttpOnly');
+
+    expect(JSON.stringify(cookies))
+        .toContain('Max-Age=604800');
   });
 
   it('본인 플레이를 조회하면 공개 정보만 반환한다', async () => {

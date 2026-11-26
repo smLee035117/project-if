@@ -23,6 +23,8 @@ import { isScenarioPublishedV2 } from './scenario-registry-v2.js';
 
 import { isLoopbackRequest } from './local-request.js';
 
+import { GUEST_SESSION_TTL_MS } from '../config/session-policy.js';
+
 
 @Controller('v2/plays')
 export class PlaysV2Controller {
@@ -82,7 +84,7 @@ export class PlaysV2Controller {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'lax',
-        maxAge: 30 * 24 * 60 * 60 * 1000,
+          maxAge: GUEST_SESSION_TTL_MS,
         path: '/',
       });
     }

@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { randomUUID, randomBytes } from 'node:crypto';
 import { Test, type TestingModule } from '@nestjs/testing';
 import { ConfigModule } from '@nestjs/config';
 import { beforeAll, afterAll, test, expect } from 'vitest';
@@ -20,6 +20,10 @@ interface PlayResultRow extends RowDataPacket {
 
 interface CountRow extends RowDataPacket {
   cnt: number;
+}
+interface GuestSessionExpiryRow extends RowDataPacket {
+    user_no: number;
+    remaining_seconds: number;
 }
 
 
@@ -253,4 +257,95 @@ test('GIVEN_UP 상태의 플레이 결과는 MySQL에 저장하지 않는다', a
     // 3. 실제 저장된 결과가 0건인지 검증
     expect(rows.length).toBe(0);
 
+});
+
+test('신규 게스트 세션은 7일 동안 유효하다', async () => {
+
+    const tokenHash = randomBytes(32).toString('hex');
+
+    let userId: number | undefined;
+
+    try {
+        userId = await service.createGuestWithSession(tokenHash);
+
+        const [rows] =
+            await verifyConnection.execute<GuestSessionExpiryRow[]>(
+                `SELECT
+                    user_no,
+                    TIMESTAMPDIFF(
+                        SECOND,
+                        UTC_TIMESTAMP(),
+                        expires_at
+                    ) AS remaining_seconds
+                FROM guest_sessions
+                WHERE token_hash = ?`,
+                [tokenHash],
+            );
+
+        expect(rows).toHaveLength(1);
+        expect(rows[0].user_no).toBe(userId);
+
+        expect(rows[0].remaining_seconds)
+            .toBeGreaterThanOrEqual(604790);
+
+        expect(rows[0].remaining_seconds)
+            .toBeLessThanOrEqual(604800);
+
+        expect(await service.findGuestUserId(tokenHash))
+            .toBe(userId);
+
+    } finally {
+        await verifyConnection.execute(
+            'DELETE FROM guest_sessions WHERE token_hash = ?',
+            [tokenHash],
+        );
+
+        if (userId !== undefined) {
+            await verifyConnection.execute(
+                'DELETE FROM users WHERE user_no = ?',
+                [userId],
+            );
+        }
+    }
+});
+
+
+test('만료된 게스트 세션으로는 인증할 수 없다', async () => {
+
+    const tokenHash = randomBytes(32).toString('hex');
+
+    let userId: number | undefined;
+
+    try {
+        userId = await service.createGuestWithSession(tokenHash);
+
+        expect(await service.findGuestUserId(tokenHash))
+            .toBe(userId);
+
+        await verifyConnection.execute(
+            `UPDATE guest_sessions
+            SET expires_at = DATE_SUB(
+                UTC_TIMESTAMP(),
+                INTERVAL 1 SECOND
+            )
+            WHERE token_hash = ?`,
+            [tokenHash],
+        );
+
+        expect(await service.findGuestUserId(tokenHash))
+            .toBeNull();
+
+    } finally {
+        await verifyConnection.execute(
+            'DELETE FROM guest_sessions WHERE token_hash = ?',
+            [tokenHash],
+        );
+
+        if (userId !== undefined) {
+            await verifyConnection.execute(
+                'DELETE FROM users WHERE user_no = ?',
+                [userId],
+            );
+        }
+    }
 });
