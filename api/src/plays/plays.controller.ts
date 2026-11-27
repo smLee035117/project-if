@@ -10,8 +10,12 @@ import { PlayData } from './types/play.js';
 import { GUEST_SESSION_TTL_MS } from '../config/session-policy.js';
 
 
+import { UseGuards } from '@nestjs/common';
+import { LegacyApiGuard } from './legacy-api.guard.js';
+
 
 @Controller('plays')
+@UseGuards(LegacyApiGuard)
 export class PlaysController {
      constructor(private readonly playsService: PlaysService) {}
     

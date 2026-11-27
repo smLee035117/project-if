@@ -44,30 +44,22 @@ export class PlaysV2Controller {
   }> {
 
 
-    const isDevelopment = process.env.NODE_ENV === 'development';
-    const isTest = process.env.NODE_ENV === 'test';
-    const isPublished = isScenarioPublishedV2(body.scenarioId);
+    const isDevelopment =
+        process.env.NODE_ENV === 'development';
 
-    const clientIp = request.ip ?? request.socket.remoteAddress ?? '';
-
-    const  isLoopback = isLoopbackRequest(request);
+    const isTest =
+        process.env.NODE_ENV === 'test';
 
     const canAccessUnpublished =
-        (isDevelopment && isLoopback) || isTest;
-
-
-    if (!canAccessUnpublished && !isPublished ) {
-        throw new NotFoundException();
-    }
-
+        isTest ||
+        (isDevelopment && isLoopbackRequest(request));
 
     if (
-        process.env.NODE_ENV === 'production' &&
+        !canAccessUnpublished &&
         !isScenarioPublishedV2(body.scenarioId)
     ) {
         throw new NotFoundException();
     }
-
 
     const token: unknown =
       request.cookies?.guest_token;
