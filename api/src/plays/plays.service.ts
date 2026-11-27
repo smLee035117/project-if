@@ -84,7 +84,7 @@ export class PlaysService {
     //
     const playId = createPlayId();
     await this.redisService.savePlay(playId,playData);
-    
+
     return { playId,playData, newToken };
   }
 
@@ -254,23 +254,23 @@ export class PlaysService {
           continue;
         }
 
-        
+
 
         if('PLAYING' !== pendingData.state && 'GIVEN_UP' !== pendingData.state) {
           await this.databaseService.savePlayResult(playId,pendingData);
 
           await this.redisService.deletePendingPlayResult(playId);
-        
-          
+
+
         }
 
-        
+
 
       } catch (error: unknown) {
 
         console.error(`복구 실패: ${playId}`, error);
 
-        
+
       }
     }
   }
@@ -326,10 +326,25 @@ export class PlaysService {
     // Redis에 V2 데이터 저장
     const playId = createPlayId();
 
-    await this.redisService.savePlayV2(
+    const saveResult = await this.redisService.savePlayV2(
       playId,
       playData,
     );
+
+
+
+    if (saveResult === 'PLAY_ID_CONFLICT') {
+        throw new InternalServerErrorException(
+            '플레이 ID 생성에 실패했습니다.',
+        );
+    }
+
+    if (saveResult === 'ACTIVE_PLAY_EXISTS') {
+        throw new ConflictException(
+            '이미 진행 중인 플레이가 존재합니다.',
+        );
+    }
+
 
     return {
       playId,
@@ -338,48 +353,99 @@ export class PlaysService {
     };
   }
 
-  async getPlayDataV2ForGuest(
-    playId: string,
-    guestToken?: string,
-  ): Promise<PlayDataV2> {
-    if (
-      !guestToken ||
-      !/^[0-9a-f]{64}$/.test(guestToken)
-    ) {
-      throw new UnauthorizedException(
-        '게스트 인증이 필요합니다.',
-      );
+
+    private async requireGuestUserId(
+        guestToken?: string,
+    ): Promise<number> {
+
+
+        if (!guestToken || !/^[0-9a-f]{64}$/.test(guestToken)) {
+            throw new UnauthorizedException('게스트 인증이 필요합니다.');
+        }
+
+        const tokenHash = hashGuestToken(guestToken);
+
+        const userId =
+            await this.databaseService.findGuestUserId(tokenHash);
+        if (userId === null) {
+            throw new UnauthorizedException('유효하지 않은 게스트 세션입니다.');
+        }
+
+        return userId;
     }
 
-    const tokenHash = hashGuestToken(guestToken);
 
-    const userId =
-      await this.databaseService.findGuestUserId(
-        tokenHash,
-      );
+    async getActivePlayV2ForGuest(
+        scenarioId: string,
+        guestToken?: string,
+    ): Promise<{
+        playId: string;
+        view: PlayViewV2;
+    } | null> {
 
-    if (userId === null) {
-      throw new UnauthorizedException(
-        '유효하지 않은 게스트 세션입니다.',
-      );
+        const userId =
+            await this.requireGuestUserId(guestToken);
+
+        const playId = await this.redisService.getActivePlayIdV2(userId,scenarioId);
+
+        if (playId === null) {
+            return null;
+        }
+
+        const playData =
+            await this.redisService.getPlayV2(playId);
+
+
+        if (playData === null || playData.userId !== userId || playData.scenarioId !== scenarioId || playData.state !== 'PLAYING') {
+            return null;
+        }
+
+
+
+        const scenario =
+            await this.loadScenarioV2ForApi(
+                playData.scenarioId,
+            );
+
+        const view = buildPlayViewV2(
+            playData,
+            scenario,
+        );
+
+
+        return {
+            playId,
+            view,
+        };
+
+
+
     }
 
-    const playData =
-      await this.redisService.getPlayV2(playId);
 
-    // 존재 여부와 소유권을 함께 확인
-    if (
-      playData === null ||
-      playData.userId !== userId
-    ) {
-      throw new NotFoundException(
-        '플레이를 찾을 수 없습니다.',
-      );
+
+    async getPlayDataV2ForGuest(
+        playId: string,
+        guestToken?: string,
+    ): Promise<PlayDataV2> {
+
+        const userId =
+            await this.requireGuestUserId(guestToken);
+
+        const playData =
+            await this.redisService.getPlayV2(playId);
+
+        if (
+            playData === null ||
+            playData.userId !== userId
+        ) {
+            throw new NotFoundException(
+                '플레이를 찾을 수 없습니다.',
+            );
+        }
+
+        return playData;
     }
-
-    return playData;
-  }
-
   async getPlayViewV2ForGuest(
     playId: string,
     guestToken?: string,

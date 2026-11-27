@@ -112,6 +112,12 @@ afterAll(async () => {
                     `pending:v2:play-result:${playId}`,
                 ]);
             }
+
+            for (const userId of userIds) {
+                await cleanupClient.del(
+                    `active:v2:${userId}:office_fire_01`,
+                );
+            }
         }
     } finally {
         if (connection) await connection.end();

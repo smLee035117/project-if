@@ -117,6 +117,12 @@ afterAll(async () => {
                     `pending:v2:play-result:${playId}`,
                 ]);
             }
+
+            if (userId !== undefined) {
+                await cleanupClient.del(
+                    `active:v2:${userId}:apartment_fire_01`,
+                );
+            }
         }
 
         if (connection) {

@@ -292,6 +292,12 @@ afterAll(async () => {
                     `pending:v2:play-result:${playId}`,
                 ]);
             }
+            for (const userId of userIds) {
+                await cleanupClient.del(
+                    `active:v2:${userId}:e4_api_test_01`,
+                );
+            }
+
         }
     } finally {
         if (connection) await connection.end();
@@ -468,4 +474,99 @@ test('실제 동시 종료 요청에서는 하나만 성공한다', async () => 
     expect(
         await redisService.getPendingPlayResultV2(playId),
     ).toBeNull();
+});
+
+
+test('실제 V2 플레이 생성부터 이어하기와 종료 후 재시작까지 정상 동작한다', async () => {
+    const { playId, cookie } = await startTestPlay();
+
+    // 1. 활성 플레이 조회
+    const active = await request(app.getHttpServer())
+        .get('/v2/plays/active/e4_api_test_01')
+        .set('Cookie', cookie);
+
+    expect(active.status).toBe(200);
+
+    expect(active.body.activePlay).toMatchObject({
+        playId,
+        view: {
+            scenarioId: 'e4_api_test_01',
+            state: 'PLAYING',
+            version: 0,
+        },
+    });
+
+    // 2. 동일 시나리오 중복 시작 방지
+    const duplicate = await request(app.getHttpServer())
+        .post('/v2/plays')
+        .set('Cookie', cookie)
+        .send({
+            scenarioId: 'e4_api_test_01',
+        });
+
+    expect(duplicate.status).toBe(409);
+
+    // 3. 기존 플레이 종료
+    const finished = await request(app.getHttpServer())
+        .post(`/v2/plays/${playId}/actions`)
+        .set('Cookie', cookie)
+        .send({
+            actionId: 'CLEAR',
+            expectedVersion: 0,
+        });
+
+    expect(finished.status).toBe(200);
+    expect(finished.body.view.state).toBe('CLEARED');
+
+    // 4. 종료 결과 MySQL 저장 확인
+    expect(await getSavedResults(playId)).toHaveLength(1);
+
+    // 5. 종료된 플레이는 활성 조회에서 제외
+    const inactive = await request(app.getHttpServer())
+        .get('/v2/plays/active/e4_api_test_01')
+        .set('Cookie', cookie);
+
+    expect(inactive.status).toBe(200);
+
+    expect(inactive.body).toEqual({
+        activePlay: null,
+    });
+
+    // 6. 동일한 게스트로 새로운 플레이 시작
+    const restarted = await request(app.getHttpServer())
+        .post('/v2/plays')
+        .set('Cookie', cookie)
+        .send({
+            scenarioId: 'e4_api_test_01',
+        });
+
+    expect(restarted.status).toBe(201);
+
+    const newPlayId: string = restarted.body.playId;
+    playIds.push(newPlayId);
+
+    expect(newPlayId).not.toBe(playId);
+
+    // 7. 활성 인덱스가 새로운 플레이를 가리키는지 확인
+    const resumed = await request(app.getHttpServer())
+        .get('/v2/plays/active/e4_api_test_01')
+        .set('Cookie', cookie);
+
+    expect(resumed.status).toBe(200);
+
+    expect(resumed.body.activePlay).toMatchObject({
+        playId: newPlayId,
+        view: {
+            state: 'PLAYING',
+            version: 0,
+        },
+    });
+
+    // 8. 기존 사용자 유지 확인
+    const oldData = await redisService.getPlayV2(playId);
+    const newData = await redisService.getPlayV2(newPlayId);
+
+    expect(oldData).not.toBeNull();
+    expect(newData).not.toBeNull();
+    expect(newData?.userId).toBe(oldData?.userId);
 });

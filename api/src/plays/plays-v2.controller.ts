@@ -95,6 +95,32 @@ export class PlaysV2Controller {
     };
   }
 
+    @Get('active/:scenarioId')
+    async getActivePlay(
+        @Param('scenarioId') scenarioId: string,
+        @Req() request: Request,
+    ): Promise<{
+        activePlay: {
+            playId: string;
+            view: PlayViewV2;
+        } | null;
+    }> {
+        const token: unknown =
+            request.cookies?.guest_token;
+
+        const activePlay =
+            await this.playsService.getActivePlayV2ForGuest(
+                scenarioId,
+                typeof token === 'string'
+                    ? token
+                    : undefined,
+            );
+
+        return {
+            activePlay,
+        };
+    }
+
   @Get(':playId')
   async getPlay(
     @Param('playId') playId: string,

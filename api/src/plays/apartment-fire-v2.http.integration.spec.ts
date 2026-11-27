@@ -236,13 +236,21 @@ afterAll(async () => {
     }
 
     if (cleanupClient?.isReady) {
-      for (const playId of playIds) {
-        await cleanupClient.del([
-          `play:v2:${playId}`,
-          `pending:v2:play-result:${playId}`,
-        ]);
-      }
+        for (const playId of playIds) {
+            await cleanupClient.del([
+            `play:v2:${playId}`,
+            `pending:v2:play-result:${playId}`,
+            ]);
+        }
+
+        for (const userId of userIds) {
+            await cleanupClient.del(
+                `active:v2:${userId}:apartment_fire_01`,
+            );
+        }
     }
+
+
   } finally {
     if (connection) await connection.end();
 

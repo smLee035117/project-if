@@ -62,7 +62,8 @@ describe('Plays V2 HTTP', () => {
   const redisMock = {
     savePlayV2: vi.fn(),
     getPlayV2: vi.fn(),
-     updatePlayV2IfVersion: vi.fn(),
+    updatePlayV2IfVersion: vi.fn(),
+    getActivePlayIdV2: vi.fn(),
   };
 
   const validToken = 'a'.repeat(64);
@@ -99,7 +100,10 @@ describe('Plays V2 HTTP', () => {
       .mockResolvedValue(4);
 
     redisMock.savePlayV2
-      .mockResolvedValue(undefined);
+        .mockResolvedValue('CREATED');
+
+      redisMock.getActivePlayIdV2
+        .mockResolvedValue(null);
 
     redisMock.updatePlayV2IfVersion.mockResolvedValue(false);
   });
@@ -519,4 +523,161 @@ describe('Plays V2 HTTP', () => {
         });
 
     });
+
+
+    it('V2 활성 플레이 조회 시 기존 playId와 공개 view를 반환한다', async () => {
+        const playData = await prepareOwnedV2Play();
+
+        playData.version = 3;
+
+        redisMock.getActivePlayIdV2
+            .mockResolvedValue('test-play');
+
+        const response = await request(app.getHttpServer())
+            .get('/v2/plays/active/v2_test_01')
+            .set('Cookie', `guest_token=${validToken}`);
+
+        expect(response.status).toBe(200);
+
+        expect(response.body.activePlay).toMatchObject({
+            playId: 'test-play',
+            view: {
+                scenarioId: 'v2_test_01',
+                state: 'PLAYING',
+                version: 3,
+            },
+        });
+
+        expect(redisMock.getActivePlayIdV2)
+            .toHaveBeenCalledWith(4, 'v2_test_01');
+
+        expect(redisMock.getPlayV2)
+            .toHaveBeenCalledWith('test-play');
+
+        expect(databaseMock.findGuestUserId)
+            .toHaveBeenCalledTimes(1);
+
+        const bodyText = JSON.stringify(response.body);
+
+        expect(bodyText).not.toContain('"userId"');
+        expect(bodyText).not.toContain('scenarioState');
+        expect(bodyText).not.toContain('insideSmoke');
+    });
+
+
+    it('V2 활성 플레이가 없으면 activePlay null을 반환한다', async () => {
+        databaseMock.findGuestUserId
+            .mockResolvedValue(4);
+
+        redisMock.getActivePlayIdV2
+            .mockResolvedValue(null);
+
+        const response = await request(app.getHttpServer())
+            .get('/v2/plays/active/v2_test_01')
+            .set('Cookie', `guest_token=${validToken}`);
+
+        expect(response.status).toBe(200);
+
+        expect(response.body).toEqual({
+            activePlay: null,
+        });
+
+        expect(redisMock.getPlayV2)
+            .not.toHaveBeenCalled();
+    });
+
+
+    it('V2 쿠키 없는 활성 플레이 조회를 거부한다', async () => {
+        const response = await request(app.getHttpServer())
+            .get('/v2/plays/active/v2_test_01');
+
+        expect(response.status).toBe(401);
+
+        expect(redisMock.getActivePlayIdV2)
+            .not.toHaveBeenCalled();
+    });
+
+    it('V2 만료된 게스트 세션의 활성 플레이 조회를 거부한다', async () => {
+        databaseMock.findGuestUserId
+            .mockResolvedValue(null);
+
+        const response = await request(app.getHttpServer())
+            .get('/v2/plays/active/v2_test_01')
+            .set('Cookie', `guest_token=${validToken}`);
+
+        expect(response.status).toBe(401);
+
+        expect(redisMock.getActivePlayIdV2)
+            .not.toHaveBeenCalled();
+    });
+
+
+    it.each([
+        'MISSING',
+        'WRONG_OWNER',
+        'WRONG_SCENARIO',
+        'FINISHED',
+    ] as const)(
+        'V2 유효하지 않은 활성 플레이(%s)는 null을 반환한다',
+        async (condition) => {
+            const playData = await prepareOwnedV2Play();
+
+            redisMock.getActivePlayIdV2
+                .mockResolvedValue('test-play');
+
+            switch (condition) {
+                case 'MISSING':
+                    redisMock.getPlayV2.mockResolvedValue(null);
+                    break;
+
+                case 'WRONG_OWNER':
+                    playData.userId = 9;
+                    break;
+
+                case 'WRONG_SCENARIO':
+                    playData.scenarioId = 'other_scenario';
+                    break;
+
+                case 'FINISHED':
+                    playData.state = 'CLEARED';
+                    break;
+            }
+
+            const response = await request(app.getHttpServer())
+                .get('/v2/plays/active/v2_test_01')
+                .set('Cookie', `guest_token=${validToken}`);
+
+            expect(response.status).toBe(200);
+
+            expect(response.body).toEqual({
+                activePlay: null,
+            });
+        },
+    );
+
+
+    it.each([
+        ['ACTIVE_PLAY_EXISTS', 409],
+        ['PLAY_ID_CONFLICT', 500],
+    ] as const)(
+        'V2 저장 결과 %s에 대해 HTTP %s를 반환한다',
+        async (saveResult, expectedStatus) => {
+            databaseMock.findGuestUserId
+                .mockResolvedValue(4);
+
+            redisMock.savePlayV2
+                .mockResolvedValue(saveResult);
+
+            const response = await request(app.getHttpServer())
+                .post('/v2/plays')
+                .set('Cookie', `guest_token=${validToken}`)
+                .send({
+                    scenarioId: 'v2_test_01',
+                });
+
+            expect(response.status).toBe(expectedStatus);
+
+            expect(response.body.playId).toBeUndefined();
+        },
+    );
 });

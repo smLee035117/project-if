@@ -1,6 +1,12 @@
 import { randomUUID } from 'node:crypto';
 import { createClient } from 'redis';
-import { beforeAll, afterAll, expect, test } from 'vitest';
+import {
+    beforeAll,
+    afterAll,
+    afterEach,
+    expect,
+    test,
+} from 'vitest';
 
 import { RedisService } from './redis.service.js';
 import type { PlayData } from '../plays/types/play.js';
@@ -26,25 +32,33 @@ beforeAll(async () => {
   await service.onModuleInit();
 });
 
-afterAll(async () => {
-  try {
-    if (cleanupClient.isReady) {
-      for (const id of playIds) {
-        await cleanupClient.del([
-          `play:${id}`,
-          `play:v2:${id}`,
-          `pending:play-result:${id}`,
-          `pending:v2:play-result:${id}`,
-        ]);
-      }
-    }
-  } finally {
-    if (cleanupClient.isOpen) {
-      await cleanupClient.close();
+afterEach(async () => {
+    if (!cleanupClient.isReady) {
+        return;
     }
 
-    await service.onModuleDestroy();
-  }
+    for (const id of playIds) {
+        await cleanupClient.del([
+            `play:${id}`,
+            `play:v2:${id}`,
+            `pending:play-result:${id}`,
+            `pending:v2:play-result:${id}`,
+        ]);
+    }
+
+    await cleanupClient.del('active:v2:4:v2_test_01');
+
+    playIds.length = 0;
+});
+
+afterAll(async () => {
+    try {
+        if (cleanupClient.isOpen) {
+            await cleanupClient.close();
+        }
+    } finally {
+        await service.onModuleDestroy();
+    }
 });
 
 test('이전 단계 기준의 저장 요청은 기존 결과를 덮어쓰지 않는다', async () => {
@@ -311,7 +325,9 @@ test('GIVEN_UP 상태에서는 pending 결과를 생성하지 않는다', async 
             0,
         );
 
-        await service.savePlayV2(playId, initial);
+        expect(
+            await service.savePlayV2(playId, initial),
+        ).toBe('CREATED');
 
         const saved = await service.getPlayV2(playId);
 
@@ -334,16 +350,18 @@ test('GIVEN_UP 상태에서는 pending 결과를 생성하지 않는다', async 
         const scenario = createV2TestScenario();
         const initial = createInitialPlayDataV2(scenario, 4, 0);
 
-        await service.savePlayV2(playId, initial);
+        expect(
+            await service.savePlayV2(playId, initial),
+        ).toBe('CREATED');
 
         const modified = {
             ...initial,
             version: 1,
         };
 
-        await expect(
-            service.savePlayV2(playId, modified),
-        ).rejects.toThrow('이미 존재하는 V2 플레이 ID입니다.');
+        expect(
+            await service.savePlayV2(playId, modified),
+        ).toBe('PLAY_ID_CONFLICT');
 
         expect(await service.getPlayV2(playId)).toEqual(initial);
     });
@@ -365,7 +383,9 @@ test('GIVEN_UP 상태에서는 pending 결과를 생성하지 않는다', async 
         'E01-A',
       ).playData;
 
-      await service.savePlayV2(playId, initial);
+      expect(
+            await service.savePlayV2(playId, initial),
+        ).toBe('CREATED');
 
       expect(
         await service.updatePlayV2IfVersion(
@@ -395,7 +415,9 @@ test('GIVEN_UP 상태에서는 pending 결과를 생성하지 않는다', async 
         'E01-A',
       ).playData;
 
-      await service.savePlayV2(playId, initial);
+      expect(
+            await service.savePlayV2(playId, initial),
+        ).toBe('CREATED');
 
       expect(
         await service.updatePlayV2IfVersion(
@@ -435,7 +457,9 @@ test('GIVEN_UP 상태에서는 pending 결과를 생성하지 않는다', async 
         storyTimeMinutes: 2,
       };
 
-      await service.savePlayV2(playId, initial);
+      expect(
+            await service.savePlayV2(playId, initial),
+        ).toBe('CREATED');
 
       const [resultA, resultB] = await Promise.all([
         service.updatePlayV2IfVersion(
@@ -472,7 +496,9 @@ test('GIVEN_UP 상태에서는 pending 결과를 생성하지 않는다', async 
               storyTimeMinutes: 5,
           };
 
-          await service.savePlayV2(playId, initial);
+          expect(
+                await service.savePlayV2(playId, initial),
+            ).toBe('CREATED');
 
           const updated = await service.updatePlayV2IfVersion(
               playId, 0, finished,
@@ -508,7 +534,9 @@ test('GIVEN_UP 상태에서는 pending 결과를 생성하지 않는다', async 
           version: 2,
       };
 
-      await service.savePlayV2(playId, initial);
+      expect(
+            await service.savePlayV2(playId, initial),
+        ).toBe('CREATED');
 
       const updated = await service.updatePlayV2IfVersion(
           playId, 1, finished,
@@ -545,7 +573,9 @@ test('GIVEN_UP 상태에서는 pending 결과를 생성하지 않는다', async 
           version: 1,
       };
 
-      await service.savePlayV2(playId, initial);
+      expect(
+            await service.savePlayV2(playId, initial),
+        ).toBe('CREATED');
 
       const [savedA, savedB] = await Promise.all([
           service.updatePlayV2IfVersion(playId, 0, resultA),
@@ -576,7 +606,9 @@ test('GIVEN_UP 상태에서는 pending 결과를 생성하지 않는다', async 
           initial, scenario, 'E01-A',
       ).playData;
 
-      await service.savePlayV2(playId, initial);
+      expect(
+            await service.savePlayV2(playId, initial),
+        ).toBe('CREATED');
 
       expect(
           await service.updatePlayV2IfVersion(playId, 0, next),
@@ -604,7 +636,9 @@ test('GIVEN_UP 상태에서는 pending 결과를 생성하지 않는다', async 
           version: 1,
       };
 
-      await service.savePlayV2(playId, initial);
+      expect(
+            await service.savePlayV2(playId, initial),
+        ).toBe('CREATED');
 
       expect(
           await service.updatePlayV2IfVersion(playId, 0, givenUp),
@@ -633,7 +667,9 @@ test('V2 행동 성공 시 플레이 TTL이 1시간으로 갱신된다', async (
         initial, scenario, 'E01-A',
     ).playData;
 
-    await service.savePlayV2(playId, initial);
+    expect(
+        await service.savePlayV2(playId, initial),
+    ).toBe('CREATED');
 
     await cleanupClient.expire(key, 60);
 
@@ -657,7 +693,9 @@ test('V2 플레이를 조회해도 TTL은 갱신되지 않는다', async () => {
     const scenario = createV2TestScenario();
     const initial = createInitialPlayDataV2(scenario, 4, 0);
 
-    await service.savePlayV2(playId, initial);
+    expect(
+        await service.savePlayV2(playId, initial),
+    ).toBe('CREATED');
 
     await cleanupClient.expire(key, 60);
 
@@ -687,7 +725,9 @@ test('V2 CAS 버전 충돌 시 TTL은 갱신되지 않는다', async () => {
         version: 2,
     };
 
-    await service.savePlayV2(playId, initial);
+    expect(
+        await service.savePlayV2(playId, initial),
+    ).toBe('CREATED');
 
     await cleanupClient.expire(key, 60);
 
@@ -720,7 +760,9 @@ test('만료된 V2 플레이는 CAS 요청으로 복원되지 않는다', async 
         initial, scenario, 'E01-A',
     ).playData;
 
-    await service.savePlayV2(playId, initial);
+    expect(
+        await service.savePlayV2(playId, initial),
+    ).toBe('CREATED');
 
     await cleanupClient.expire(key, 0);
 
@@ -736,4 +778,298 @@ test('만료된 V2 플레이는 CAS 요청으로 복원되지 않는다', async 
 
     expect(await cleanupClient.ttl(key))
         .toBe(-2);
+});
+
+
+test('V2 신규 플레이 생성 시 활성 인덱스도 함께 저장한다', async () => {
+    const playId = `test-${randomUUID()}`;
+    playIds.push(playId);
+
+    const scenario = createV2TestScenario();
+    const initial = createInitialPlayDataV2(scenario, 4, 0);
+
+    expect(
+        await service.savePlayV2(playId, initial),
+    ).toBe('CREATED');
+
+    expect(
+        await service.getActivePlayIdV2(4, scenario.scenarioId),
+    ).toBe(playId);
+
+    const ttl = await cleanupClient.ttl(
+        `active:v2:4:${scenario.scenarioId}`,
+    );
+
+    expect(ttl).toBeGreaterThanOrEqual(3595);
+    expect(ttl).toBeLessThanOrEqual(3600);
+});
+
+test('V2 동일 시나리오 동시 생성 요청 중 하나만 성공한다', async () => {
+    const playIdA = `test-${randomUUID()}`;
+    const playIdB = `test-${randomUUID()}`;
+
+    playIds.push(playIdA, playIdB);
+
+    const scenario = createV2TestScenario();
+    const initial = createInitialPlayDataV2(scenario, 4, 0);
+
+    const [resultA, resultB] = await Promise.all([
+        service.savePlayV2(playIdA, initial),
+        service.savePlayV2(playIdB, initial),
+    ]);
+
+    expect([resultA, resultB].sort()).toEqual([
+        'ACTIVE_PLAY_EXISTS',
+        'CREATED',
+    ]);
+
+    const winnerId =
+        resultA === 'CREATED' ? playIdA : playIdB;
+
+    const loserId =
+        resultA === 'CREATED' ? playIdB : playIdA;
+
+    expect(
+        await service.getActivePlayIdV2(4, scenario.scenarioId),
+    ).toBe(winnerId);
+
+    expect(
+        await service.getPlayV2(winnerId),
+    ).toEqual(initial);
+
+    expect(
+        await service.getPlayV2(loserId),
+    ).toBeNull();
+});
+
+test('V2 기존 플레이가 만료되면 신규 플레이로 활성 인덱스를 교체한다', async () => {
+    const oldPlayId = `test-${randomUUID()}`;
+    const newPlayId = `test-${randomUUID()}`;
+
+    playIds.push(oldPlayId, newPlayId);
+
+    const scenario = createV2TestScenario();
+    const initial = createInitialPlayDataV2(scenario, 4, 0);
+
+    expect(
+        await service.savePlayV2(oldPlayId, initial),
+    ).toBe('CREATED');
+
+    await cleanupClient.del(`play:v2:${oldPlayId}`);
+
+    expect(
+        await service.getActivePlayIdV2(4, scenario.scenarioId),
+    ).toBe(oldPlayId);
+
+    expect(
+        await service.savePlayV2(newPlayId, initial),
+    ).toBe('CREATED');
+
+    expect(
+        await service.getActivePlayIdV2(4, scenario.scenarioId),
+    ).toBe(newPlayId);
+
+    expect(
+        await service.getPlayV2(newPlayId),
+    ).toEqual(initial);
+});
+
+test('V2 행동 성공 시 활성 인덱스 TTL도 함께 갱신한다', async () => {
+    const playId = `test-${randomUUID()}`;
+    playIds.push(playId);
+
+    const scenario = createV2TestScenario();
+    const initial = createInitialPlayDataV2(scenario, 4, 0);
+
+    const next = executeActionV2(
+        initial,
+        scenario,
+        'E01-A',
+    ).playData;
+
+    expect(
+        await service.savePlayV2(playId, initial),
+    ).toBe('CREATED');
+
+    const playKey = `play:v2:${playId}`;
+    const activeKey = `active:v2:4:${scenario.scenarioId}`;
+
+    await cleanupClient.expire(playKey, 60);
+    await cleanupClient.expire(activeKey, 60);
+
+    expect(
+        await service.updatePlayV2IfVersion(playId, 0, next),
+    ).toBe(true);
+
+    const playTTL = await cleanupClient.ttl(playKey);
+    const activeTTL = await cleanupClient.ttl(activeKey);
+
+    expect(playTTL).toBeGreaterThanOrEqual(3595);
+    expect(activeTTL).toBeGreaterThanOrEqual(3595);
+
+    expect(playTTL).toBeLessThanOrEqual(3600);
+    expect(activeTTL).toBeLessThanOrEqual(3600);
+
+    expect(Math.abs(playTTL - activeTTL)).toBeLessThanOrEqual(1);
+});
+
+test.each(['CLEARED', 'FAILED', 'GIVEN_UP'] as const)(
+    'V2 %s 종료 시 활성 인덱스를 제거한다',
+    async (state) => {
+        const playId = `test-${randomUUID()}`;
+        playIds.push(playId);
+
+        const scenario = createV2TestScenario();
+        const initial = createInitialPlayDataV2(scenario, 4, 0);
+
+        expect(
+            await service.savePlayV2(playId, initial),
+        ).toBe('CREATED');
+
+        const finished = {
+            ...initial,
+            state,
+            version: 1,
+            endingId: `TEST_${state}`,
+        };
+
+        expect(
+            await service.updatePlayV2IfVersion(
+                playId,
+                0,
+                finished,
+            ),
+        ).toBe(true);
+
+        expect(
+            await service.getActivePlayIdV2(
+                4,
+                scenario.scenarioId,
+            ),
+        ).toBeNull();
+
+        expect(
+            await service.getPlayV2(playId),
+        ).toEqual(finished);
+    },
+);
+
+
+test('V2 동일 사용자는 서로 다른 시나리오를 동시에 진행할 수 있다', async () => {
+    const playIdA = `test-${randomUUID()}`;
+    const playIdB = `test-${randomUUID()}`;
+
+    playIds.push(playIdA, playIdB);
+
+    const scenario = createV2TestScenario();
+
+    const initialA = createInitialPlayDataV2(scenario, 4, 0);
+
+    const initialB = {
+        ...initialA,
+        scenarioId: 'v2_test_02',
+    };
+
+    try {
+        expect(
+            await service.savePlayV2(playIdA, initialA),
+        ).toBe('CREATED');
+
+        expect(
+            await service.savePlayV2(playIdB, initialB),
+        ).toBe('CREATED');
+
+        expect(
+            await service.getActivePlayIdV2(4, initialA.scenarioId),
+        ).toBe(playIdA);
+
+        expect(
+            await service.getActivePlayIdV2(4, initialB.scenarioId),
+        ).toBe(playIdB);
+    } finally {
+        await cleanupClient.del('active:v2:4:v2_test_02');
+    }
+});
+
+
+test('V2 CAS 실패 시 활성 인덱스 TTL을 갱신하지 않는다', async () => {
+    const playId = `test-${randomUUID()}`;
+    playIds.push(playId);
+
+    const scenario = createV2TestScenario();
+    const initial = createInitialPlayDataV2(scenario, 4, 0);
+
+    expect(
+        await service.savePlayV2(playId, initial),
+    ).toBe('CREATED');
+
+    const activeKey = `active:v2:4:${scenario.scenarioId}`;
+
+    await cleanupClient.expire(activeKey, 60);
+
+    const beforeTTL = await cleanupClient.ttl(activeKey);
+
+    const next = {
+        ...initial,
+        version: 2,
+    };
+
+    expect(
+        await service.updatePlayV2IfVersion(playId, 1, next),
+    ).toBe(false);
+
+    const afterTTL = await cleanupClient.ttl(activeKey);
+
+    expect(afterTTL).toBeGreaterThan(0);
+    expect(afterTTL).toBeLessThanOrEqual(beforeTTL);
+
+    expect(
+        await service.getActivePlayIdV2(4, scenario.scenarioId),
+    ).toBe(playId);
+});
+
+
+test('V2 기존 플레이 종료 시 다른 플레이의 활성 인덱스를 삭제하지 않는다', async () => {
+    const playIdA = `test-${randomUUID()}`;
+    const playIdB = `test-${randomUUID()}`;
+
+    playIds.push(playIdA, playIdB);
+
+    const scenario = createV2TestScenario();
+    const initial = createInitialPlayDataV2(scenario, 4, 0);
+
+    expect(
+        await service.savePlayV2(playIdA, initial),
+    ).toBe('CREATED');
+
+    const activeKey = `active:v2:4:${scenario.scenarioId}`;
+
+    // 기존 인덱스가 유실된 상황 재현
+    await cleanupClient.del(activeKey);
+
+    expect(
+        await service.savePlayV2(playIdB, initial),
+    ).toBe('CREATED');
+
+    const finished = {
+        ...initial,
+        state: 'GIVEN_UP' as const,
+        version: 1,
+    };
+
+    expect(
+        await service.updatePlayV2IfVersion(
+            playIdA,
+            0,
+            finished,
+        ),
+    ).toBe(true);
+
+    expect(
+        await service.getActivePlayIdV2(4, scenario.scenarioId),
+    ).toBe(playIdB);
+
+    expect(
+        await service.getPlayV2(playIdB),
+    ).toEqual(initial);
 });

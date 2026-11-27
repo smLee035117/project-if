@@ -11,6 +11,11 @@ import type { PlayData } from '../plays/types/play.js';
 import type { PlayDataV2 } from '../plays/types/play-v2.js';
 
 
+export type SavePlayV2Result =
+    | 'CREATED'
+    | 'PLAY_ID_CONFLICT'
+    | 'ACTIVE_PLAY_EXISTS';
+
 
 @Injectable()
 export class RedisService
@@ -82,7 +87,7 @@ export class RedisService
      const data: PlayData = JSON.parse(value);
 
      return data;
-    
+
   }
 
 
@@ -139,12 +144,12 @@ export class RedisService
   }
 
   async deletePendingPlayResult(playId: string): Promise<void> {
-    
+
       const pendingKey = `pending:play-result:${playId}`;
       await this.client.del(pendingKey);
 
   }
-  
+
 
 
   async scanPendingPlayIds(): Promise<string[]> {
@@ -159,14 +164,14 @@ export class RedisService
 
         for (const key of keys) {
           const playId = key.slice(prefix.length);
-          
+
           // playIds에 추가
           playIds.add(playId);
         }
 
 
-        
-        
+
+
       }
 
       return [...playIds];
@@ -174,25 +179,67 @@ export class RedisService
   }
 
 
-  async savePlayV2(
-      playId: string,
-      data: PlayDataV2,
-  ): Promise<void> {
-      const key = `play:v2:${playId}`;
+    async savePlayV2(
+        playId: string,
+        data: PlayDataV2,
+    ): Promise<SavePlayV2Result> {
 
-      const result = await this.client.set(
-          key,
-          JSON.stringify(data),
-          {
-              EX: 3600,
-              NX: true,
-          },
-      );
+        const playKey = `play:v2:${playId}`;
+        const activeKey = `active:v2:${data.userId}:${data.scenarioId}`;
 
-      if (result !== 'OK') {
-          throw new Error('이미 존재하는 V2 플레이 ID입니다.');
-      }
-  }
+        const script = `
+        local value = redis.call('GET', KEYS[1])
+
+        if value then
+            return 0
+        end
+
+        local activePlayId = redis.call('GET', KEYS[2])
+
+        if activePlayId then
+            local key = 'play:v2:' .. activePlayId
+            local activeValue = redis.call('GET', key)
+
+            if activeValue then
+                local data = cjson.decode(activeValue)
+                local checkData = cjson.decode(ARGV[1])
+
+                if data.state == 'PLAYING' and
+                    data.userId == checkData.userId and
+                    data.scenarioId == checkData.scenarioId then
+                    return 2
+                end
+            end
+        end
+
+        redis.call('SET', KEYS[1], ARGV[1], 'EX', 3600)
+        redis.call('SET', KEYS[2], ARGV[2], 'EX', 3600)
+
+        return 1
+    `;
+
+        const result = await this.client.eval(script, {
+            keys: [playKey, activeKey],
+            arguments: [
+                JSON.stringify(data),
+                playId,
+            ],
+        });
+
+        switch (result) {
+            case 0:
+                return 'PLAY_ID_CONFLICT';
+
+            case 1:
+                return 'CREATED';
+
+            case 2:
+                return 'ACTIVE_PLAY_EXISTS';
+
+            default:
+                throw new Error('알 수 없는 V2 플레이 저장 결과입니다.');
+        }
+    }
 
   async getPlayV2(
       playId: string,
@@ -206,6 +253,17 @@ export class RedisService
       return JSON.parse(value) as PlayDataV2;
   }
 
+
+    async getActivePlayIdV2(
+        userId: number,
+        scenarioId: string,
+    ): Promise<string | null> {
+
+        return await this.client.get(
+            `active:v2:${userId}:${scenarioId}`,
+        );
+
+    }
 
 
   async updatePlayV2IfVersion(
@@ -225,6 +283,7 @@ export class RedisService
 
       const playKey = `play:v2:${playId}`;
       const pendingKey = `pending:v2:play-result:${playId}`;
+      const activeKey = `active:v2:${nextData.userId}:${nextData.scenarioId}`;
 
       const script = `
           local value = redis.call('GET', KEYS[1])
@@ -283,14 +342,26 @@ export class RedisService
 
           redis.call('SET', KEYS[1], ARGV[2], 'EX', 3600)
 
+            local activePlayId = redis.call('GET', KEYS[3])
+
+            if activePlayId == ARGV[3] then
+                 if nextState == 'PLAYING' then
+                redis.call('EXPIRE', KEYS[3], 3600)
+                else
+                redis.call('DEL', KEYS[3])
+                end
+
+            end
+
           return 1
       `;
 
       const result = await this.client.eval(script, {
-          keys: [playKey, pendingKey],
+          keys: [playKey, pendingKey, activeKey],
           arguments: [
               String(expectedVersion),
               JSON.stringify(nextData),
+              playId,
           ],
       });
 
