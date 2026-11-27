@@ -565,6 +565,59 @@ export class PlaysService {
   }
 
 
+    async giveUpPlayV2(
+        playId: string,
+        expectedVersion: number,
+        guestToken?: string,
+    ): Promise<PlayViewV2> {
+
+        const playData =
+            await this.getPlayDataV2ForGuest(
+                playId,
+                guestToken,
+            );
+
+        if (
+            playData.state !== 'PLAYING' ||
+            playData.version !== expectedVersion
+        ) {
+            throw new ConflictException(
+                '플레이 상태가 변경되었습니다. 다시 조회해 주세요.',
+            );
+        }
+
+        const nextData: PlayDataV2 = {
+            ...playData,
+            version: playData.version + 1,
+            state: 'GIVEN_UP',
+        };
+
+        const scenario =
+            await this.loadScenarioV2ForApi(
+                playData.scenarioId,
+            );
+
+        const nextView = buildPlayViewV2(
+            nextData,
+            scenario,
+        );
+
+        const updated =
+            await this.redisService.updatePlayV2IfVersion(
+                playId,
+                expectedVersion,
+                nextData,
+            );
+
+        if (!updated) {
+            throw new ConflictException(
+                '플레이 상태가 변경되었거나 만료되었습니다. 다시 조회해 주세요.',
+            );
+        }
+
+        return nextView;
+    }
+
 
   async recoverPendingPlayResultsV2(): Promise<void> {
       const playIds =

@@ -570,3 +570,183 @@ test('실제 V2 플레이 생성부터 이어하기와 종료 후 재시작까�
     expect(newData).not.toBeNull();
     expect(newData?.userId).toBe(oldData?.userId);
 });
+
+
+test('실제 V2 플레이 포기 후 동일 시나리오를 재시작할 수 있다', async () => {
+    const { playId, cookie } = await startTestPlay();
+
+    const original = await redisService.getPlayV2(playId);
+
+    expect(original).not.toBeNull();
+
+    // 1. 플레이 포기
+    const response = await request(app.getHttpServer())
+        .post(`/v2/plays/${playId}/give-up`)
+        .set('Cookie', cookie)
+        .send({
+            expectedVersion: 0,
+        });
+
+    expect(response.status).toBe(200);
+
+    expect(response.body).toMatchObject({
+        state: 'GIVEN_UP',
+        version: 1,
+        storyTimeMinutes: original!.storyTimeMinutes,
+        actions: [],
+    });
+
+    expect(response.body.ending).toBeUndefined();
+
+    // 2. 실제 Redis 저장 결과 확인
+    const abandoned = await redisService.getPlayV2(playId);
+
+    expect(abandoned).toEqual({
+        ...original,
+        state: 'GIVEN_UP',
+        version: 1,
+    });
+
+    // 3. MySQL 결과 및 pending 미생성 확인
+    expect(await getSavedResults(playId)).toHaveLength(0);
+
+    expect(
+        await redisService.getPendingPlayResultV2(playId),
+    ).toBeNull();
+
+    // 4. 실제 활성 인덱스 제거 확인
+    expect(
+        await redisService.getActivePlayIdV2(
+            original!.userId,
+            original!.scenarioId,
+        ),
+    ).toBeNull();
+
+    const inactive = await request(app.getHttpServer())
+        .get('/v2/plays/active/e4_api_test_01')
+        .set('Cookie', cookie);
+
+    expect(inactive.status).toBe(200);
+    expect(inactive.body).toEqual({
+        activePlay: null,
+    });
+
+    // 5. 포기한 플레이의 추가 행동 거부
+    const action = await request(app.getHttpServer())
+        .post(`/v2/plays/${playId}/actions`)
+        .set('Cookie', cookie)
+        .send({
+            actionId: 'CLEAR',
+            expectedVersion: 1,
+        });
+
+    expect(action.status).toBe(409);
+
+    // 6. 동일 게스트로 재시작
+    const restarted = await request(app.getHttpServer())
+        .post('/v2/plays')
+        .set('Cookie', cookie)
+        .send({
+            scenarioId: 'e4_api_test_01',
+        });
+
+    expect(restarted.status).toBe(201);
+
+    const newPlayId: string = restarted.body.playId;
+    playIds.push(newPlayId);
+
+    expect(newPlayId).not.toBe(playId);
+
+    const newData = await redisService.getPlayV2(newPlayId);
+
+    expect(newData).toMatchObject({
+        userId: original!.userId,
+        state: 'PLAYING',
+        version: 0,
+    });
+
+    // 7. 새로운 활성 인덱스 확인
+    expect(
+        await redisService.getActivePlayIdV2(
+            original!.userId,
+            original!.scenarioId,
+        ),
+    ).toBe(newPlayId);
+
+    // 8. 이전 플레이 상태 유지 확인
+    expect(
+        await redisService.getPlayV2(playId),
+    ).toEqual(abandoned);
+});
+
+
+test('V2 행동 요청과 포기 요청이 경쟁하면 하나만 성공한다', async () => {
+    const { playId, cookie } = await startTestPlay();
+
+    const original = await redisService.getPlayV2(playId);
+
+    expect(original).not.toBeNull();
+
+    const [actionResponse, giveUpResponse] = await Promise.all([
+        request(app.getHttpServer())
+            .post(`/v2/plays/${playId}/actions`)
+            .set('Cookie', cookie)
+            .send({
+                actionId: 'CLEAR',
+                expectedVersion: 0,
+            }),
+
+        request(app.getHttpServer())
+            .post(`/v2/plays/${playId}/give-up`)
+            .set('Cookie', cookie)
+            .send({
+                expectedVersion: 0,
+            }),
+    ]);
+
+    // 1. 반드시 하나만 성공
+    expect([
+        actionResponse.status,
+        giveUpResponse.status,
+    ].sort()).toEqual([200, 409]);
+
+    const finalData = await redisService.getPlayV2(playId);
+    const rows = await getSavedResults(playId);
+
+    expect(finalData).not.toBeNull();
+    expect(finalData?.version).toBe(1);
+
+    // 2. 성공한 요청에 따라 최종 상태 검증
+    if (actionResponse.status === 200) {
+        expect(finalData?.state).toBe('CLEARED');
+        expect(finalData?.storyTimeMinutes).toBe(1);
+
+        expect(rows).toHaveLength(1);
+
+        expect(rows[0]).toMatchObject({
+            result_state: 'CLEARED',
+            ending_id: 'E_CLEAR',
+            play_version: 1,
+        });
+    } else {
+        expect(giveUpResponse.status).toBe(200);
+
+        expect(finalData?.state).toBe('GIVEN_UP');
+        expect(finalData?.storyTimeMinutes).toBe(0);
+
+        expect(rows).toHaveLength(0);
+    }
+
+    // 3. 어느 요청이 성공해도 활성 인덱스 제거
+    expect(
+        await redisService.getActivePlayIdV2(
+            original!.userId,
+            original!.scenarioId,
+        ),
+    ).toBeNull();
+
+    // 4. 처리되지 않은 pending 결과가 없어야 함
+    expect(
+        await redisService.getPendingPlayResultV2(playId),
+    ).toBeNull();
+});

@@ -18,6 +18,7 @@ import type { PlayViewV2 } from './types/play-view-v2.js';
 
 import { HttpCode } from '@nestjs/common';
 import { SubmitActionV2Dto } from './dto/submit-action-v2.dto.js';
+import { GiveUpPlayV2Dto } from './dto/give-up-play-v2.dto.js';
 
 import { isScenarioPublishedV2 } from './scenario-registry-v2.js';
 
@@ -160,4 +161,24 @@ export class PlaysV2Controller {
         : undefined,
     );
   }
+
+    @Post(':playId/give-up')
+    @HttpCode(200)
+    async giveUpPlay(
+        @Param('playId') playId: string,
+        @Body() body: GiveUpPlayV2Dto,
+        @Req() request: Request,
+    ): Promise<PlayViewV2> {
+
+        const token: unknown =
+            request.cookies?.guest_token;
+
+        return this.playsService.giveUpPlayV2(
+            playId,
+            body.expectedVersion,
+            typeof token === 'string'
+                ? token
+                : undefined,
+        );
+    }
 }
